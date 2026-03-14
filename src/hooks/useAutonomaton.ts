@@ -303,12 +303,29 @@ export function useAutonomaton() {
     const currentStage = currentState.pipeline.current_stage
 
     // 1. VALIDATE: Is this transition legal from the current state?
+    // Invalid transitions MUST fire Jidoka — no silent failures
     if (!isValidTransition(currentStage, action)) {
       logInvalidTransition(currentStage, action)
+
+      // Andon Gate blocked invalid transition — fire Jidoka halt
+      const invalidHalt: JidokaEvent = {
+        id: crypto.randomUUID(),
+        stage: currentStage,
+        trigger: 'malformed_data', // State machine violation
+        details: `ANDON GATE: Blocked invalid transition "${action.type}" from ${currentStage} stage. This indicates a state machine bug that requires investigation.`,
+        timestamp: new Date().toISOString(),
+        resolved: false,
+      }
+
+      // Fire Jidoka halt (visible in UI)
+      dispatch({ type: 'JIDOKA_HALT', event: invalidHalt })
+      dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: generateKaizenProposal(invalidHalt) })
+
       // Log the invalid transition attempt
       dispatch({
         type: 'TELEMETRY_LOGGED',
         entry: telemetry.createTelemetryEntry(currentStage, 'invalid_transition', {
+          jidoka: true,
           details: `Attempted: ${action.type}`,
         }),
       })

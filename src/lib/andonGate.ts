@@ -129,7 +129,10 @@ const UNIVERSAL_ACTIONS = [
   'TELEMETRY_LOGGED',
   'TELEMETRY_CLEARED',
   'STATE_HYDRATED',
-  'JIDOKA_RESOLVE', // Can always resolve a halt
+  'JIDOKA_RESOLVE',           // Can always resolve a halt
+  'JIDOKA_HALT',              // Halts can fire from any stage
+  'KAIZEN_PROPOSAL_CREATED',  // Kaizen can be created for any halt
+  'KAIZEN_OPTION_SELECTED',   // Can always select a Kaizen option
 ]
 
 /**

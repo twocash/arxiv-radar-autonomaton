@@ -116,6 +116,7 @@ const VALID_TRANSITIONS: Record<PipelineStage, string[]> = {
 
   execution: [
     'SET_STAGE',
+    'START_POLL',      // Circuit auto-restart
     'SKILL_PROMOTED',
     'TELEMETRY_LOGGED',
     'RESET_STATE',

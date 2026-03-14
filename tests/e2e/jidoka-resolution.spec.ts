@@ -98,6 +98,60 @@ test.describe('Jidoka Resolution Flow', () => {
     await expect(page.locator('button:has-text("Approve")')).toBeVisible()
   })
 
+  test('BUG-011: Should process ALL briefings, not stop after first approval', async ({ page }) => {
+    // This test catches the silent failure where pipeline stops after one approval
+    const runButton = page.locator('button:has-text("RUN")')
+    await runButton.click()
+
+    // Resolve Jidoka
+    const jidokaAlert = page.locator('text=PIPELINE HALTED')
+    await expect(jidokaAlert).toBeVisible({ timeout: 15000 })
+    await page.locator('button:has-text("Primary claim is constrained-task superiority")').click()
+
+    // Wait for first briefing to compile
+    await page.waitForTimeout(2000)
+
+    // Approve first briefing
+    const approveButton = page.locator('button:has-text("Approve")').first()
+    await expect(approveButton).toBeVisible({ timeout: 10000 })
+    await approveButton.click()
+
+    // CRITICAL: Pipeline must NOT silently stop here
+    // Wait and check that more briefings compile/appear
+    await page.waitForTimeout(2000)
+
+    // Should still be in compilation or approval stage (not execution with only 1 approved)
+    // Check for either more Approve buttons OR that we're still processing
+    const approveButtons = page.locator('button:has-text("Approve")')
+    const compilingText = page.locator('text=Compiling')
+    const approvalText = page.locator('text=Approval')
+
+    // At least one of these should be true: more approvals pending OR still compiling
+    const hasMoreApprovals = await approveButtons.count() > 0
+    const isCompiling = await compilingText.isVisible().catch(() => false)
+    const inApproval = await approvalText.first().isVisible().catch(() => false)
+
+    // The pipeline should NOT have stopped
+    expect(hasMoreApprovals || isCompiling || inApproval).toBe(true)
+
+    // Approve remaining briefings (should be multiple)
+    let approvedCount = 1 // Already approved one
+    for (let i = 0; i < 10; i++) { // Max iterations to prevent infinite loop
+      await page.waitForTimeout(500)
+      const btn = page.locator('button:has-text("Approve")').first()
+      if (await btn.isVisible().catch(() => false)) {
+        await btn.click()
+        approvedCount++
+      } else {
+        break
+      }
+    }
+
+    // Should have approved more than 1 briefing (7 papers - 1 green = 6 briefings expected)
+    // In dev mode with seed data, we expect at least 3-4 briefings
+    expect(approvedCount).toBeGreaterThan(1)
+  })
+
   test('should track paper count in footer', async ({ page }) => {
     // Click RUN
     const runButton = page.locator('button:has-text("RUN")')

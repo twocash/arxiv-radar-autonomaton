@@ -623,6 +623,21 @@ export function useAutonomaton() {
     }
   }, [state.jidoka_halts, state.pipeline.current_stage])
 
+  // --- EXECUTION STAGE: Complete pipeline cycle ---
+  useEffect(() => {
+    const { current_stage } = state.pipeline
+
+    if (current_stage !== 'execution') return
+
+    // Execution stage: all briefings approved, cycle complete
+    // In v0.1.0, execution means "done" — return to idle
+    // Future: could trigger actual publishing, email sending, etc.
+    console.log(`[Pipeline] Execution: Cycle complete. ${state.approved_briefings.length} briefings approved.`)
+
+    // Transition back to idle (through Andon Gate)
+    transition({ type: 'SET_STAGE', stage: 'idle' })
+  }, [state.pipeline.current_stage, state.approved_briefings.length, transition])
+
   // ==========================================================================
   // PIPELINE CONTROL — All use transition()
   // ==========================================================================

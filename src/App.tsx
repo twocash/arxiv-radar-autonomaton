@@ -49,6 +49,7 @@ function App() {
   const [voicePreset, setVoicePreset] = useState<VoicePresetId>('news_brief')
 
   const hasError = pipeline.last_error !== null
+  const hasCompletedCycle = flywheelStats.papers_seen > 0
 
   const handleRun = useCallback((_query?: string) => {
     startPipeline()
@@ -97,6 +98,7 @@ function App() {
           hasError={hasError}
           isPolling={pipeline.is_polling}
           hasUnresolvedHalts={hasUnresolvedHalts}
+          hasCompletedCycle={hasCompletedCycle}
         />
 
         {/* Jidoka Alert */}

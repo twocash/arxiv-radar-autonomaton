@@ -15,6 +15,7 @@ interface Props {
   hasError: boolean
   isPolling: boolean
   hasUnresolvedHalts?: boolean
+  hasCompletedCycle?: boolean // True if papers have been processed before
 }
 
 const STAGES: { id: PipelineStage; label: string; shortLabel: string }[] = [
@@ -55,7 +56,13 @@ function StageIcon({ status }: { status: StageStatus }) {
   }
 }
 
-export function GlassPipeline({ currentStage, hasError, isPolling, hasUnresolvedHalts = false }: Props) {
+export function GlassPipeline({
+  currentStage,
+  hasError,
+  isPolling,
+  hasUnresolvedHalts = false,
+  hasCompletedCycle = false,
+}: Props) {
   const statusText = useMemo(() => {
     if (hasUnresolvedHalts) return 'HALTED — Awaiting resolution'
     switch (currentStage) {
@@ -63,10 +70,12 @@ export function GlassPipeline({ currentStage, hasError, isPolling, hasUnresolved
       case 'recognition': return 'Classifying papers...'
       case 'compilation': return 'Generating briefings...'
       case 'approval': return 'Awaiting review'
-      case 'execution': return 'Executing...'
+      case 'execution': return 'Completing cycle...'
+      case 'idle':
+        return hasCompletedCycle ? 'Awaiting new research' : 'Ready'
       default: return 'Ready'
     }
-  }, [currentStage, hasUnresolvedHalts])
+  }, [currentStage, hasUnresolvedHalts, hasCompletedCycle])
 
   return (
     <div

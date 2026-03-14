@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(grove-foundation-loop)",
+      "Bash(dir:*)",
+      "Bash(npm create:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install)",
+      "Bash(Copy-Item -Recurse C:GitHubgrove-arxiv-radarconfig srcconfig)",
+      "Bash(Copy-Item -Recurse C:GitHubgrove-arxiv-radarstate srcstate)",
+      "Bash(Copy-Item -Recurse C:GitHubgrove-arxiv-radarknowledge srcknowledge)",
+      "Bash(Copy-Item -Recurse C:GitHubgrove-arxiv-radarprompts srcprompts)",
+      "Bash(Copy-Item -Recurse C:GitHubgrove-arxiv-radarseed srcseed)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout /t:*)",
+      "Bash(ls -la \"C:\\\\GitHub\\\\grove-arxiv-radar\\\\src\"\" 2>/dev/null || ls -la \"C:GitHubgrove-arxiv-radar\"\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout:*)",
+      "Bash(claude mcp__puppeteer__puppeteer_navigate --url \"http://localhost:5173\")",
+      "Bash(npx playwright test:*)",
+      "Bash(node test-fixes.mjs:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm run test:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

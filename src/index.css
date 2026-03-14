@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+:root {
+  /* Grove Foundation Design System */
+  --bg-primary: #0D0D0D;
+  --bg-secondary: #121212;
+  --bg-surface: #1A1A1A;
+  --bg-elevated: #222222;
+
+  --text-primary: #E8E2D9;
+  --text-secondary: #B0A898;
+  --text-muted: #7A7264;
+
+  --accent: #D4621A;
+  --accent-hover: #E87A2E;
+
+  --zone-green: #2D5A27;
+  --zone-green-text: #5EBF50;
+  --zone-yellow: #B8860B;
+  --zone-yellow-text: #E8C94A;
+  --zone-red: #8B2500;
+  --zone-red-text: #E85A3A;
+
+  --jidoka-bg: #3D1010;
+  --jidoka-border: #FF3333;
+
+  --border: #2A2A2A;
+
+  /* Spacing */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --space-8: 64px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography */
+.font-heading {
+  font-family: 'Instrument Serif', serif;
+}
+
+.font-mono {
+  font-family: 'Fragment Mono', monospace;
+}
+
+.font-body {
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Zone badges */
+.zone-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: 'Fragment Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.zone-badge-green {
+  background-color: rgba(45, 90, 39, 0.15);
+  color: var(--zone-green-text);
+}
+
+.zone-badge-yellow {
+  background-color: rgba(184, 134, 11, 0.15);
+  color: var(--zone-yellow-text);
+}
+
+.zone-badge-red {
+  background-color: rgba(139, 37, 0, 0.15);
+  color: var(--zone-red-text);
+}
+
+/* Jidoka alert styling */
+.jidoka-alert {
+  background-color: var(--jidoka-bg);
+  border-left: 3px solid var(--jidoka-border);
+  animation: jidoka-pulse 2s ease-in-out infinite;
+}
+
+@keyframes jidoka-pulse {
+  0%, 100% {
+    border-left-color: var(--jidoka-border);
+  }
+  50% {
+    border-left-color: #FF6666;
+  }
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: 'Fragment Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--text-muted);
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Input styles */
+input, textarea {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Pipeline stage indicator */
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-family: 'Fragment Mono', monospace;
+  font-size: 11px;
+}
+
+.pipeline-stage-complete {
+  color: var(--zone-green-text);
+}
+
+.pipeline-stage-active {
+  color: var(--accent);
+}
+
+.pipeline-stage-pending {
+  color: var(--text-muted);
+}
+
+.pipeline-stage-halt {
+  color: var(--zone-red-text);
+  animation: jidoka-pulse 2s ease-in-out infinite;
+}
+
+/* Card styles */
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: var(--space-2);
+}
+
+.card-elevated {
+  background-color: var(--bg-elevated);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

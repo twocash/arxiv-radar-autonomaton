@@ -146,11 +146,19 @@ function logActionDetails(
       break
 
     case 'POLL_COMPLETE':
-      console.log(
-        `%c${PREFIX.pipeline}%cTelemetry → POLL_COMPLETE (${action.papers.length} papers)`,
-        STYLES.pipeline,
-        STYLES.dim
-      )
+      if (action.papers.length === 0) {
+        console.log(
+          `%c${PREFIX.pipeline}%cTelemetry → No new papers. Circuit waiting.`,
+          STYLES.pipeline,
+          STYLES.dim
+        )
+      } else {
+        console.log(
+          `%c${PREFIX.pipeline}%cTelemetry → POLL_COMPLETE (${action.papers.length} papers)`,
+          STYLES.pipeline,
+          STYLES.dim
+        )
+      }
       break
 
     case 'PAPER_CLASSIFIED': {

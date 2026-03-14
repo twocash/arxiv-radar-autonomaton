@@ -33,7 +33,28 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
         },
       }
 
-    case 'POLL_COMPLETE':
+    case 'POLL_COMPLETE': {
+      // Filter out papers we've already processed (archived or briefed)
+      const seenIds = new Set([
+        ...state.archived_papers.map(p => p.arxiv_id),
+        ...state.approved_briefings.map(b => b.paper.arxiv_id),
+        ...state.rejected_briefings.map(r => r.draft.paper.arxiv_id),
+      ])
+      const newPapers = action.papers.filter(p => !seenIds.has(p.arxiv_id))
+
+      // If no new papers, stay in idle (circuit waits for next poll)
+      if (newPapers.length === 0) {
+        return {
+          ...state,
+          pipeline: {
+            ...state.pipeline,
+            current_stage: 'idle',
+            is_polling: false,
+            last_poll: new Date().toISOString(),
+          },
+        }
+      }
+
       return {
         ...state,
         pipeline: {
@@ -42,12 +63,13 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
           is_polling: false,
           last_poll: new Date().toISOString(),
         },
-        incoming_papers: action.papers,
+        incoming_papers: newPapers,
         stats: {
           ...state.stats,
-          papers_seen: state.stats.papers_seen + action.papers.length,
+          papers_seen: state.stats.papers_seen + newPapers.length,
         },
       }
+    }
 
     case 'POLL_ERROR':
       return {

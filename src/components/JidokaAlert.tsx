@@ -59,7 +59,7 @@ export function JidokaAlert({ halt, kaizenProposal, onResolve, onSelectKaizen }:
 
   return (
     <div
-      className="jidoka-alert mx-6 mt-6 p-4"
+      className="jidoka-alert mb-6 p-4"
       style={{ borderRadius: '2px' }}
     >
       {/* Header — this is governance, not an error */}

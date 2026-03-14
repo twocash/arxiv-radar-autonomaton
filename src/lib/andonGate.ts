@@ -1,13 +1,23 @@
 /**
- * arXiv Radar — Transition Guards
+ * THE ANDON GATE
  *
- * This is the guard enforcement layer for the pipeline state machine.
- * The reducer IS the state machine. This module provides:
+ * Three concepts from Toyota, three roles in the code:
  *
+ * JIDOKA (the principle) — Machines detect abnormalities, humans approve fixes.
+ *   → See: services/jidoka.ts, state/types.ts (JidokaEvent)
+ *
+ * ANDON GATE (the mechanism) — THIS FILE. The architectural chokepoint.
+ *   Every state transition passes through runAndonGate(). No bypass.
+ *   This is what makes Jidoka structural, not aspirational.
+ *
+ * KAIZEN (the response) — The system proposes the fix, not just the halt.
+ *   → See: services/jidoka.ts (generateKaizenProposal), components/JidokaAlert.tsx
+ *
+ * "Toyoda's andon cord, digitized." — Grove Autonomaton Pattern, Draft 1.3
+ *
+ * This module provides:
  * 1. Transition validation — Is this transition legal from the current state?
- * 2. Jidoka guards — Should this transition halt for human judgment?
- *
- * These guards run on EVERY transition. There is no bypass.
+ * 2. Andon Gate — Should this transition halt for human judgment?
  *
  * @license CC BY 4.0
  */
@@ -29,7 +39,7 @@ function isPaperClassifiedAction(action: CombinedAction): action is { type: 'PAP
   return action.type === 'PAPER_CLASSIFIED'
 }
 
-export interface JidokaGuardResult {
+export interface AndonGateResult {
   halt: boolean
   event?: JidokaEvent
 }
@@ -149,10 +159,10 @@ export function isValidTransition(
  * These guards are STRUCTURAL. They run on every transition.
  * There is no code path that skips them.
  */
-export function runJidokaGuards(
+export function runAndonGate(
   state: AppState,
   action: CombinedAction
-): JidokaGuardResult {
+): AndonGateResult {
   // Guard 1: API key required for non-dev mode Tier 2 operations
   if (shouldCheckApiKey(state, action)) {
     if (!state.settings.api_key && !state.settings.dev_mode) {
@@ -199,7 +209,7 @@ export function runJidokaGuards(
 /**
  * Check if a paper should trigger Jidoka.
  */
-function checkPaperJidoka(paper: ArxivPaper | { arxiv_id: string; matched_topics?: string[] }): JidokaGuardResult {
+function checkPaperJidoka(paper: ArxivPaper | { arxiv_id: string; matched_topics?: string[] }): AndonGateResult {
   // If paper already has matched_topics (even empty), trust it — this paper
   // was already classified (possibly by human override). Don't re-run
   // keyword matching which would re-trigger Jidoka.

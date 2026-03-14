@@ -6,7 +6,7 @@
  * This hook implements the core Autonomaton pattern:
  * - `dispatch` is PRIVATE. It is not exposed.
  * - `transition()` is the ONLY way to change state.
- * - Jidoka guards run on EVERY transition. There is no bypass.
+ * - The Andon Gate runs on EVERY transition. There is no bypass.
  * - Telemetry logs automatically on every transition (Feed-First).
  *
  * "Three files and a loop" — transition() IS the loop.
@@ -34,9 +34,9 @@ import { INITIAL_STATE } from '../state/types'
 import { usePersistedState, getHydratedInitialState } from './usePersistedState'
 import {
   isValidTransition,
-  runJidokaGuards,
+  runAndonGate,
   type CombinedAction,
-} from '../lib/transitionGuards'
+} from '../lib/andonGate'
 import * as telemetry from '../services/telemetry'
 import { generateKaizenProposal } from '../services/jidoka'
 import { runFlywheelScan } from '../services/flywheel'
@@ -317,8 +317,8 @@ export function useAutonomaton() {
       return false
     }
 
-    // 2. GUARD: Run Jidoka checks BEFORE the transition
-    const jidokaResult = runJidokaGuards(currentState, action)
+    // 2. ANDON GATE: Every transition passes through the gate
+    const jidokaResult = runAndonGate(currentState, action)
     if (jidokaResult.halt && jidokaResult.event) {
       console.log(`[Pipeline] JIDOKA HALT: ${jidokaResult.event.trigger}`, jidokaResult.event)
       // Transition blocked. Enter JidokaHalt state.

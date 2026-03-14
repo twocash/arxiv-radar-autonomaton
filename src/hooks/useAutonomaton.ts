@@ -35,8 +35,10 @@ import { usePersistedState, getHydratedInitialState } from './usePersistedState'
 import {
   isValidTransition,
   runAndonGate,
+  getTargetStage,
   type CombinedAction,
 } from '../lib/andonGate'
+import { logTransition, logInvalidTransition } from '../lib/consoleLog'
 import * as telemetry from '../services/telemetry'
 import { generateKaizenProposal } from '../services/jidoka'
 import { runFlywheelScan } from '../services/flywheel'
@@ -300,13 +302,9 @@ export function useAutonomaton() {
     const currentState = stateRef.current
     const currentStage = currentState.pipeline.current_stage
 
-    console.log(`[Pipeline] ${action.type}`, { stage: currentStage })
-
     // 1. VALIDATE: Is this transition legal from the current state?
     if (!isValidTransition(currentStage, action)) {
-      console.warn(
-        `[Autonomaton] Invalid transition: ${currentStage} → ${action.type}`
-      )
+      logInvalidTransition(currentStage, action)
       // Log the invalid transition attempt
       dispatch({
         type: 'TELEMETRY_LOGGED',
@@ -318,14 +316,18 @@ export function useAutonomaton() {
     }
 
     // 2. ANDON GATE: Every transition passes through the gate
-    const jidokaResult = runAndonGate(currentState, action)
-    if (jidokaResult.halt && jidokaResult.event) {
-      console.log(`[Pipeline] JIDOKA HALT: ${jidokaResult.event.trigger}`, jidokaResult.event)
+    const gateResult = runAndonGate(currentState, action)
+    const targetStage = getTargetStage(action)
+
+    // LOG: Single call site for all console telemetry
+    logTransition({ action, state: currentState, gateResult, targetStage })
+
+    if (gateResult.halt && gateResult.event) {
       // Transition blocked. Enter JidokaHalt state.
-      dispatch({ type: 'JIDOKA_HALT', event: jidokaResult.event })
+      dispatch({ type: 'JIDOKA_HALT', event: gateResult.event })
 
       // Generate Kaizen proposal
-      const kaizenProposal = generateKaizenProposal(jidokaResult.event)
+      const kaizenProposal = generateKaizenProposal(gateResult.event)
       dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: kaizenProposal })
 
       // Log the halt (Feed-First)
@@ -333,8 +335,8 @@ export function useAutonomaton() {
         type: 'TELEMETRY_LOGGED',
         entry: telemetry.createTelemetryEntry(currentStage, 'jidoka_halt', {
           jidoka: true,
-          details: jidokaResult.event.trigger,
-          arxiv_id: jidokaResult.event.paper_id,
+          details: gateResult.event.trigger,
+          arxiv_id: gateResult.event.paper_id,
         }),
       })
 

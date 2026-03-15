@@ -692,9 +692,20 @@ export function useAutonomaton() {
     }
   }, [state.jidoka_halts, state.pipeline.current_stage])
 
+  // --- EXECUTION STAGE: Complete the 5-stage invariant ---
+  // Per Autonomaton whitepaper: every cognitive interaction passes through all 5 stages
+  // This stage fires after approval decision, then continues to next paper or idle
+  useEffect(() => {
+    if (state.pipeline.current_stage !== 'execution') return
+
+    console.log(`[Pipeline] EXECUTION: ${state.incoming_papers.length} papers remaining`)
+
+    // Single clean transition — telemetry handled by transition system
+    transition({ type: 'EXECUTION_COMPLETE' })
+  }, [state.pipeline.current_stage, state.incoming_papers.length, transition])
+
   // --- IDLE STAGE: Cycle complete, ready for next run ---
   // ONE-PIECE FLOW: No auto-restart. User clicks RUN when ready.
-  // The execution stage is no longer used — we go directly to idle.
   useEffect(() => {
     const { current_stage, total_papers_this_cycle } = state.pipeline
 
@@ -984,6 +995,11 @@ function createTelemetryForAction(
       return telemetry.createTelemetryEntry(stage, 'jidoka_resolved', {
         human_feedback: 'resolved',
         details: action.resolution,
+      })
+
+    case 'EXECUTION_COMPLETE':
+      return telemetry.createTelemetryEntry('execution', 'stage_complete', {
+        details: `${state.incoming_papers.length} papers remaining`,
       })
 
     default:

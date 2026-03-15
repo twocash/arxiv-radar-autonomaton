@@ -77,6 +77,9 @@ const VALID_TRANSITIONS: Record<PipelineStage, string[]> = {
     'JIDOKA_HALT',
     'TELEMETRY_LOGGED',
     'RESET_STATE',
+    // Allow skill governance during active pipeline
+    'SKILL_PROPOSAL_APPROVED',
+    'SKILL_PROPOSAL_REJECTED',
   ],
 
   recognition: [
@@ -87,6 +90,9 @@ const VALID_TRANSITIONS: Record<PipelineStage, string[]> = {
     'SKILL_FIRED',
     'TELEMETRY_LOGGED',
     'RESET_STATE',
+    // Allow skill governance during active pipeline
+    'SKILL_PROPOSAL_APPROVED',
+    'SKILL_PROPOSAL_REJECTED',
   ],
 
   compilation: [
@@ -96,6 +102,9 @@ const VALID_TRANSITIONS: Record<PipelineStage, string[]> = {
     'JIDOKA_HALT',
     'TELEMETRY_LOGGED',
     'RESET_STATE',
+    // Allow skill governance during active pipeline
+    'SKILL_PROPOSAL_APPROVED',
+    'SKILL_PROPOSAL_REJECTED',
   ],
 
   approval: [
@@ -116,10 +125,14 @@ const VALID_TRANSITIONS: Record<PipelineStage, string[]> = {
 
   execution: [
     'SET_STAGE',
-    'START_POLL',      // Circuit auto-restart
+    'EXECUTION_COMPLETE',  // 5-stage invariant: signals execution done
+    'START_POLL',          // Circuit auto-restart
     'SKILL_PROMOTED',
     'TELEMETRY_LOGGED',
     'RESET_STATE',
+    // Allow skill governance during active pipeline
+    'SKILL_PROPOSAL_APPROVED',
+    'SKILL_PROPOSAL_REJECTED',
   ],
 }
 
@@ -269,10 +282,11 @@ function shouldCheckApiKey(state: AppState, action: CombinedAction): boolean {
  * Determine the target stage after an action.
  * Used to validate the transition makes sense.
  *
- * ONE-PIECE FLOW: Each paper flows through all stages before the next.
+ * 5-STAGE INVARIANT: Each paper flows through all stages before the next.
  * - PAPER_CLASSIFIED → compilation (for this paper's briefing)
- * - PAPER_ARCHIVED → stay in recognition (process next paper) or idle (done)
- * - BRIEFING_APPROVED/REJECTED → recognition (process next paper) or idle (done)
+ * - PAPER_ARCHIVED → stay in recognition (GREEN papers skip to next)
+ * - BRIEFING_APPROVED/REJECTED → execution (complete the 5-stage invariant)
+ * - EXECUTION_COMPLETE → recognition (process next paper) or idle (done)
  */
 export function getTargetStage(action: CombinedAction): PipelineStage | null {
   switch (action.type) {
@@ -288,7 +302,9 @@ export function getTargetStage(action: CombinedAction): PipelineStage | null {
       return 'approval'
     case 'BRIEFING_APPROVED':
     case 'BRIEFING_REJECTED':
-      return 'recognition' // ONE-PIECE: Continue to next paper (reducer handles idle)
+      return 'execution' // 5-STAGE INVARIANT: Always go through execution
+    case 'EXECUTION_COMPLETE':
+      return 'recognition' // After execution, process next paper (reducer handles idle)
     case 'JIDOKA_HALT':
       return null // Special state, handled by halt logic
     case 'SET_STAGE':

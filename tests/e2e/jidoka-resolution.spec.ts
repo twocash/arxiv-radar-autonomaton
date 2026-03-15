@@ -22,8 +22,8 @@ test.describe('Jidoka Resolution Flow', () => {
   })
 
   test('should display initial idle state', async ({ page }) => {
-    // Check header
-    await expect(page.locator('text=arXiv Radar')).toBeVisible()
+    // Check header (use h1 to target CommandBar, not WelcomeCard)
+    await expect(page.locator('h1:has-text("arXiv Radar")')).toBeVisible()
     await expect(page.locator('text=v0.1.0')).toBeVisible()
 
     // Check pipeline is in idle state

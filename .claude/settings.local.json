@@ -27,7 +27,16 @@
       "Bash(npx playwright:*)",
       "Bash(npm run test:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: arXiv Radar v0.1.0 with Jidoka resolution flow fixes\n\nCore bug fixes:\n- Fix Jidoka resolution flow: Pipeline now respects human override decisions\n- Fix PAPER_ARCHIVED: Remove from incoming_papers \\(was causing infinite loops\\)\n- Fix POLL_COMPLETE guard: Don''t block all papers on single Jidoka trigger\n- Fix checkPaperJidoka: Trust existing matched_topics to prevent re-triggering\n\nArchitectural improvements:\n- Jidoka fires correctly on conflicting evidence \\(nervous system\\)\n- Kaizen proposes options and records decision \\(proposal layer\\)\n- Classifier respects human governance decisions \\(execution layer\\)\n- Human override via applyHumanResolution\\(\\) helper\n\nTest suite:\n- Add Playwright E2E tests for Jidoka resolution flow\n- Add tests for UI bug fixes \\(BUG-002 through BUG-010\\)\n- All 11 tests passing\n\nFiles modified:\n- src/hooks/useAutonomaton.ts \\(human override check + helper\\)\n- src/state/reducer.ts \\(PAPER_ARCHIVED fix\\)\n- src/lib/transitionGuards.ts \\(POLL_COMPLETE + checkPaperJidoka fixes\\)\n- tests/e2e/jidoka-resolution.spec.ts \\(new\\)\n- playwright.config.ts \\(new\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git mv:*)",
+      "Bash(git commit:*)",
+      "Bash(gh repo create:*)",
+      "Bash(powershell -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

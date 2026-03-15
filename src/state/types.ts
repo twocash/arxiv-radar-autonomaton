@@ -188,6 +188,9 @@ export type ArxivRadarAction =
   | { type: 'JIDOKA_HALT'; event: JidokaEvent }
   | { type: 'JIDOKA_RESOLVE'; eventId: string; resolution: string }
   
+  // Execution
+  | { type: 'EXECUTION_COMPLETE' }
+
   // Reset
   | { type: 'CLEAR_QUEUES' }
   | { type: 'RESET_STATE' }

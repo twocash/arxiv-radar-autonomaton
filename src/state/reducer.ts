@@ -124,32 +124,28 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     }
 
     case 'PAPER_ARCHIVED': {
-      // ONE-PIECE FLOW: GREEN paper archived → continue to next paper
-      // GREEN papers flow through silently without governance pause
+      // 5-STAGE INVARIANT: Even GREEN papers go through execution
+      // Nothing avoids the loop — that's the point
       const tier = action.paper.classified_by.tier
-      const remainingIncoming = state.incoming_papers.filter(
-        p => p.arxiv_id !== action.paper.arxiv_id
-      )
 
       return {
         ...state,
         archived_papers: [...state.archived_papers, action.paper],
-        // Remove from both queues — paper may come from either incoming (direct archive)
-        // or classified (post-briefing archive)
-        incoming_papers: remainingIncoming,
+        // Remove from both queues
+        incoming_papers: state.incoming_papers.filter(
+          p => p.arxiv_id !== action.paper.arxiv_id
+        ),
         classified_papers: state.classified_papers.filter(
           p => p.arxiv_id !== action.paper.arxiv_id
         ),
         pipeline: {
           ...state.pipeline,
           current_paper_index: state.pipeline.current_paper_index + 1,
-          // If no more papers, cycle complete
-          current_stage: remainingIncoming.length === 0 ? 'idle' : state.pipeline.current_stage,
+          current_stage: 'execution', // 5-STAGE INVARIANT: Go through execution
         },
         stats: {
           ...state.stats,
           total_api_cost_usd: state.stats.total_api_cost_usd + (action.classification_cost_usd ?? 0),
-          // Track Flywheel economics: T0 = free local, T2 = cloud costs money
           tier0_classifications: tier === 0 ? state.stats.tier0_classifications + 1 : state.stats.tier0_classifications,
           tier2_classifications: tier === 2 ? state.stats.tier2_classifications + 1 : state.stats.tier2_classifications,
         },
@@ -185,8 +181,8 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     // =========================================================================
     
     case 'BRIEFING_APPROVED': {
-      // ONE-PIECE FLOW: After approving, return to recognition for next paper
-      // The human just made a governance decision — now continue the flow
+      // 5-STAGE INVARIANT: After approval, ALWAYS go to execution
+      // The execution stage is part of the immutable pipeline per the Autonomaton whitepaper
       const draft = state.pending_briefings.find(b => b.id === action.briefingId)
       if (!draft) return state
 
@@ -200,19 +196,11 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
 
       const remainingPending = state.pending_briefings.filter(b => b.id !== action.briefingId)
 
-      // ONE-PIECE FLOW: Determine next stage
-      // - More incoming papers → back to recognition (process next paper)
-      // - No more papers → cycle complete (idle)
-      let nextStage: 'recognition' | 'idle' = 'idle'
-      if (state.incoming_papers.length > 0) {
-        nextStage = 'recognition'
-      }
-
       return {
         ...state,
         pending_briefings: remainingPending,
         approved_briefings: [...state.approved_briefings, approved],
-        pipeline: { ...state.pipeline, current_stage: nextStage },
+        pipeline: { ...state.pipeline, current_stage: 'execution' }, // 5-STAGE INVARIANT
         stats: {
           ...state.stats,
           briefings_approved: state.stats.briefings_approved + 1,
@@ -221,7 +209,8 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     }
 
     case 'BRIEFING_REJECTED': {
-      // ONE-PIECE FLOW: After rejecting, return to recognition for next paper
+      // 5-STAGE INVARIANT: After rejection, ALWAYS go to execution
+      // Even rejections go through execution stage per the Autonomaton whitepaper
       const draft = state.pending_briefings.find(b => b.id === action.briefingId)
       if (!draft) return state
 
@@ -233,19 +222,11 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
 
       const remainingPending = state.pending_briefings.filter(b => b.id !== action.briefingId)
 
-      // ONE-PIECE FLOW: Determine next stage
-      // - More incoming papers → back to recognition (process next paper)
-      // - No more papers → cycle complete (idle)
-      let nextStage: 'recognition' | 'idle' = 'idle'
-      if (state.incoming_papers.length > 0) {
-        nextStage = 'recognition'
-      }
-
       return {
         ...state,
         pending_briefings: remainingPending,
         rejected_briefings: [...state.rejected_briefings, rejected],
-        pipeline: { ...state.pipeline, current_stage: nextStage },
+        pipeline: { ...state.pipeline, current_stage: 'execution' }, // 5-STAGE INVARIANT
         stats: {
           ...state.stats,
           briefings_rejected: state.stats.briefings_rejected + 1,
@@ -260,6 +241,23 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
           b.id === action.briefingId ? { ...b, ...action.changes } : b
         ),
       }
+
+    // =========================================================================
+    // EXECUTION — 5-Stage Invariant completion
+    // =========================================================================
+
+    case 'EXECUTION_COMPLETE': {
+      // After execution, continue to next paper or complete the cycle
+      // This preserves the 5-stage invariant: every paper goes through execution
+      const hasMorePapers = state.incoming_papers.length > 0
+      return {
+        ...state,
+        pipeline: {
+          ...state.pipeline,
+          current_stage: hasMorePapers ? 'recognition' : 'idle',
+        },
+      }
+    }
 
     // =========================================================================
     // CONFIG

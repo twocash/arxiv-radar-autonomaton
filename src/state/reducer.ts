@@ -192,17 +192,38 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     case 'BRIEFING_REJECTED': {
       const draft = state.pending_briefings.find(b => b.id === action.briefingId)
       if (!draft) return state
-      
+
       const rejected: RejectedBriefing = {
         draft,
         rejected_at: new Date().toISOString(),
         reason: action.reason,
       }
-      
+
+      const remainingPending = state.pending_briefings.filter(b => b.id !== action.briefingId)
+
+      // Determine next stage (same logic as BRIEFING_APPROVED)
+      const papersWithBriefings = new Set([
+        ...remainingPending.map(b => b.paper.arxiv_id),
+        ...state.approved_briefings.map(b => b.paper.arxiv_id),
+        ...state.rejected_briefings.map(r => r.draft.paper.arxiv_id),
+        draft.paper.arxiv_id, // The one we just rejected
+      ])
+      const papersNeedingBriefings = state.classified_papers.filter(
+        p => !papersWithBriefings.has(p.arxiv_id)
+      )
+
+      let nextStage: 'approval' | 'compilation' | 'execution' = 'execution'
+      if (remainingPending.length > 0) {
+        nextStage = 'approval'
+      } else if (papersNeedingBriefings.length > 0) {
+        nextStage = 'compilation'
+      }
+
       return {
         ...state,
-        pending_briefings: state.pending_briefings.filter(b => b.id !== action.briefingId),
+        pending_briefings: remainingPending,
         rejected_briefings: [...state.rejected_briefings, rejected],
+        pipeline: { ...state.pipeline, current_stage: nextStage },
         stats: {
           ...state.stats,
           briefings_rejected: state.stats.briefings_rejected + 1,

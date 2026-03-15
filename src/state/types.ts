@@ -72,6 +72,15 @@ export interface ClassifiedPaper extends ArxivPaper {
 }
 
 // =============================================================================
+// THESIS SIGNAL
+// =============================================================================
+
+export type ThesisSignal =
+  | 'supports_decentralized'   // 🟢 Evidence for local/efficient/open
+  | 'supports_centralized'     // 🔴 Reinforces "you need us" narrative (treat skeptically)
+  | 'neutral'                  // ⚪ Orthogonal to the debate
+
+// =============================================================================
 // BRIEFING TYPES
 // =============================================================================
 
@@ -81,10 +90,26 @@ export interface DraftBriefing {
   paper: ClassifiedPaper
   voice_preset: VoicePresetId
   headline: string
-  body: string
+
+  // Structured content (new)
+  lead: string                 // "Why This Matters" paragraph
+  analysis: string             // 2-3 paragraph body (inverted pyramid)
+
+  // Thesis signal (new)
+  thesis_signal: ThesisSignal
+  thesis_reason: string        // One sentence explanation
+
+  // Direct link for convenience (new)
+  arxiv_url: string
+
+  // Existing fields
   key_claims: string[]
   caveats: string[]
-  tier_migration_impact?: string // Assessment of how this affects tier migration timelines
+
+  // Deprecated but kept for backward compat
+  body?: string                // Old unstructured field
+  tier_migration_impact?: string
+
   compiled_at: string
   compiled_by: {
     tier: CognitiveTier

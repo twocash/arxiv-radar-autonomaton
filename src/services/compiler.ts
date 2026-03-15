@@ -8,7 +8,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk'
-import type { ClassifiedPaper, DraftBriefing } from '../state/types'
+import type { ClassifiedPaper, DraftBriefing, ThesisSignal } from '../state/types'
 import type { VoicePresetId } from '../config/voices'
 import { getVoicePreset } from '../config/voices'
 import { getBriefingPrompt, interpolatePrompt } from '../lib/loadPrompts'
@@ -133,8 +133,8 @@ Write the briefing now. Follow the voice template rules exactly.`
 
     const rawOutput = textContent.text
 
-    // Parse the output into headline and body
-    const { headline, body, key_claims, caveats, tier_migration_impact } = parseBriefingOutput(rawOutput)
+    // Parse the output into structured fields
+    const parsed = parseBriefingOutput(rawOutput)
 
     // Calculate costs
     const inputTokens = response.usage.input_tokens
@@ -145,11 +145,15 @@ Write the briefing now. Follow the voice template rules exactly.`
       id: crypto.randomUUID(),
       paper,
       voice_preset: voicePreset,
-      headline,
-      body,
-      key_claims,
-      caveats,
-      tier_migration_impact,
+      headline: parsed.headline,
+      lead: parsed.lead,
+      analysis: parsed.analysis,
+      thesis_signal: parsed.thesis_signal,
+      thesis_reason: parsed.thesis_reason,
+      arxiv_url: paper.arxiv_url,
+      key_claims: parsed.key_claims,
+      caveats: parsed.caveats,
+      body: parsed.body, // Keep for backward compat
       compiled_at: new Date().toISOString(),
       compiled_by: {
         tier: 2,
@@ -181,16 +185,33 @@ Write the briefing now. Follow the voice template rules exactly.`
 // OUTPUT PARSING
 // =============================================================================
 
-/**
- * Parse raw LLM output into structured briefing fields.
- */
-function parseBriefingOutput(raw: string): {
+interface ParsedBriefing {
   headline: string
-  body: string
+  lead: string
+  analysis: string
+  thesis_signal: ThesisSignal
+  thesis_reason: string
   key_claims: string[]
   caveats: string[]
-  tier_migration_impact?: string
-} {
+  body?: string // Legacy field for backward compat
+}
+
+/**
+ * Parse raw LLM output into structured briefing fields.
+ *
+ * Expected format:
+ * ## Headline
+ * **Why This Matters:** Lead paragraph
+ * ### The Research
+ * Analysis paragraphs...
+ * ### Key Claims
+ * - claim 1
+ * ### Caveats
+ * - caveat 1
+ * ### Thesis Signal
+ * 🟢/🔴/⚪ **SIGNAL:** reason
+ */
+function parseBriefingOutput(raw: string): ParsedBriefing {
   const lines = raw.trim().split('\n')
 
   // Find headline (usually first non-empty line, may start with ** or #)
@@ -213,21 +234,117 @@ function parseBriefingOutput(raw: string): {
 
   // Body is everything after the headline
   const bodyLines = lines.slice(bodyStartIndex).filter(l => l.trim())
-  const body = bodyLines.join('\n\n').trim()
+  const fullBody = bodyLines.join('\n').trim()
 
-  // Extract key claims (sentences that state findings as facts)
-  const key_claims = extractKeyClaims(body)
+  // Extract structured sections
+  const lead = extractSection(fullBody, 'Why This Matters') ||
+               extractSection(fullBody, 'Thesis') ||
+               extractFirstParagraph(fullBody)
 
-  // Extract caveats (sentences with limiting language)
-  const caveats = extractCaveats(body)
+  const analysis = extractSection(fullBody, 'The Research') ||
+                   extractSection(fullBody, 'Analysis') ||
+                   fullBody
+
+  // Extract thesis signal
+  const { signal, reason } = extractThesisSignal(fullBody)
+
+  // Extract key claims (from ### Key Claims section or by parsing)
+  const key_claims = extractBulletSection(fullBody, 'Key Claims') ||
+                     extractBulletSection(fullBody, 'Key findings') ||
+                     extractKeyClaims(fullBody)
+
+  // Extract caveats
+  const caveats = extractBulletSection(fullBody, 'Caveats') ||
+                  extractCaveats(fullBody)
 
   return {
     headline,
-    body,
+    lead,
+    analysis,
+    thesis_signal: signal,
+    thesis_reason: reason,
     key_claims,
     caveats,
-    tier_migration_impact: undefined, // Could be extracted with more sophisticated parsing
+    body: fullBody, // Keep for backward compat
   }
+}
+
+/**
+ * Extract a named section from markdown body.
+ */
+function extractSection(body: string, sectionName: string): string {
+  const regex = new RegExp(`(?:^|\\n)(?:#+\\s*|\\*\\*)?${sectionName}[:\\s]*\\*?\\*?\\s*([\\s\\S]*?)(?=\\n#+|\\n\\*\\*|$)`, 'i')
+  const match = body.match(regex)
+  if (match) {
+    return match[1].trim().replace(/^\*\*|\*\*$/g, '')
+  }
+  return ''
+}
+
+/**
+ * Extract bullet points from a named section.
+ */
+function extractBulletSection(body: string, sectionName: string): string[] | null {
+  const sectionContent = extractSection(body, sectionName)
+  if (!sectionContent) return null
+
+  const bullets = sectionContent
+    .split('\n')
+    .filter(line => line.trim().startsWith('-') || line.trim().startsWith('•'))
+    .map(line => line.replace(/^[-•]\s*/, '').trim())
+    .filter(Boolean)
+
+  return bullets.length > 0 ? bullets : null
+}
+
+/**
+ * Extract first paragraph (for lead fallback).
+ */
+function extractFirstParagraph(body: string): string {
+  const paragraphs = body.split(/\n\n+/).filter(p => p.trim())
+  return paragraphs[0]?.trim() || ''
+}
+
+/**
+ * Extract thesis signal and reason from body.
+ */
+function extractThesisSignal(body: string): { signal: ThesisSignal; reason: string } {
+  // Look for emoji indicators
+  if (body.includes('🟢') || body.toLowerCase().includes('supports decentralized')) {
+    const reason = extractThesisReason(body, '🟢') ||
+                   extractThesisReason(body, 'SUPPORTS DECENTRALIZED') ||
+                   'Evidence for local/efficient AI advancement'
+    return { signal: 'supports_decentralized', reason }
+  }
+
+  if (body.includes('🔴') || body.toLowerCase().includes('supports centralized')) {
+    const reason = extractThesisReason(body, '🔴') ||
+                   extractThesisReason(body, 'SUPPORTS CENTRALIZED') ||
+                   'Reinforces centralized narrative'
+    return { signal: 'supports_centralized', reason }
+  }
+
+  if (body.includes('⚪') || body.toLowerCase().includes('neutral')) {
+    const reason = extractThesisReason(body, '⚪') ||
+                   extractThesisReason(body, 'NEUTRAL') ||
+                   'Orthogonal to the centralized/decentralized debate'
+    return { signal: 'neutral', reason }
+  }
+
+  // Default based on content analysis
+  return { signal: 'neutral', reason: 'Thesis signal not explicitly stated' }
+}
+
+/**
+ * Extract the reason following a thesis signal marker.
+ */
+function extractThesisReason(body: string, marker: string): string {
+  const regex = new RegExp(`${marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^:]*[:—\\-]?\\s*(.+?)(?:\\n|$)`, 'i')
+  const match = body.match(regex)
+  if (match) {
+    return match[1].trim().replace(/^\*+|\*+$/g, '')
+  }
+  return ''
 }
 
 /**
@@ -277,68 +394,86 @@ function extractCaveats(body: string): string[] {
  * Mock compilation for dev mode (no API call).
  *
  * Produces meaningfully different output per voice:
- * - news_brief: ≤150 words, 8th grade, "what changed → why it matters → what to watch"
- * - technical_summary: ≤250 words, ML background assumed, method/edge/caveats/tier impact
- * - strategic_intel: ≤100 words, no technical details, business impact focus
+ * - quick_scan: 1-2 para, punchy, thesis-forward
+ * - deep_analysis: 4-5 para, McKinsey style, full structure
+ * - social_post: Threads-optimized, hook + bullets + thesis
  */
 export function mockCompileBriefing(
   paper: ClassifiedPaper,
   voicePreset: VoicePresetId
 ): DraftBriefing {
-  const voice = getVoicePreset(voicePreset)
   const topicLabel = paper.matched_topics[0] || 'AI research'
-  const zoneLabel = paper.zone.toUpperCase()
 
-  // Voice-specific headline generation
-  const headlines: Record<VoicePresetId, string> = {
-    quick_scan: paper.zone === 'red'
-      ? `Local AI just got a signal worth watching: ${paper.title.slice(0, 60)}`
-      : `New ${topicLabel} research shifts the deployment calculus`,
-    social_post: paper.zone === 'red'
-      ? `🔴 This just changed the game for local AI 👇`
-      : `New research in ${topicLabel} — here's what it means:`,
-    deep_analysis: paper.zone === 'red'
-      ? `Strategic signal: ${paper.title.slice(0, 60)}`
-      : `${topicLabel} — new evidence for the trajectory`,
+  // Determine thesis signal based on paper characteristics
+  const thesisSignal: ThesisSignal = paper.zone === 'red'
+    ? 'supports_decentralized'
+    : paper.relevance_score > 0.7
+    ? 'supports_decentralized'
+    : 'neutral'
+
+  const thesisReason = thesisSignal === 'supports_decentralized'
+    ? 'Evidence for local/efficient AI advancement'
+    : 'Orthogonal to the centralized/decentralized debate'
+
+  // Voice-specific content generation
+  const content: Record<VoicePresetId, {
+    headline: string
+    lead: string
+    analysis: string
+  }> = {
+    quick_scan: {
+      headline: paper.zone === 'red'
+        ? `Local AI just got a signal worth watching: ${paper.title.slice(0, 60)}`
+        : `New ${topicLabel} research shifts the deployment calculus`,
+      lead: `This paper addresses ${paper.matched_topics.join(' and ')}. ` +
+        `The findings suggest the gap between frontier and local capability ` +
+        `continues to narrow on targeted tasks. Watch for reproduction attempts.`,
+      analysis: '',
+    },
+    deep_analysis: {
+      headline: paper.zone === 'red'
+        ? `Strategic signal: ${paper.title.slice(0, 60)}`
+        : `${topicLabel} — new evidence for the trajectory`,
+      lead: `This paper on ${paper.matched_topics.join(' and ')} signals continued progress toward local AI viability. ` +
+        `For engineers building with the Cognitive Router pattern, this is relevant signal.`,
+      analysis: `The paper addresses ${paper.title}. Categories: ${paper.categories.join(', ')}. ` +
+        `Relevance score: ${paper.relevance_score.toFixed(2)}.\n\n` +
+        `This type of research ${paper.zone === 'red' ? 'significantly advances' : 'incrementally supports'} the thesis ` +
+        `that local inference can match or exceed cloud capabilities on targeted tasks.\n\n` +
+        `Limitations remain: this is a mock briefing in dev mode. Full analysis requires Tier 2 compilation.`,
+    },
+    social_post: {
+      headline: paper.zone === 'red'
+        ? `🔴 This just changed the game for local AI 👇`
+        : `New research in ${topicLabel} — here's what it means:`,
+      lead: `${paper.matched_topics[0] || 'AI'} progress continues. ` +
+        `Gap between local and frontier narrowing. Watch for real-world deployment.`,
+      analysis: '',
+    },
   }
 
-  // Voice-specific body generation
-  const bodies: Record<VoicePresetId, string> = {
-    quick_scan: `${voice.example_opening || ''}\n\n` +
-      `This paper addresses ${paper.matched_topics.join(' and ')}. ` +
-      `The findings suggest the gap between frontier and local capability ` +
-      `continues to narrow on targeted tasks. ` +
-      `Watch for reproduction attempts.\n\n` +
-      `**Thesis:** 🟢 Supports Decentralized — More evidence that local inference is catching up.`,
-    social_post: `${voice.example_opening || ''}\n\n` +
-      `Key findings:\n` +
-      `• ${paper.matched_topics[0] || 'AI'} progress continues\n` +
-      `• Gap between local and frontier narrowing\n` +
-      `• Watch for real-world deployment\n\n` +
-      `🟢 More evidence that you don't need Big Cloud.`,
-    deep_analysis: `**Why This Matters:** ` +
-      `This paper on ${paper.matched_topics.join(' and ')} signals continued progress toward local AI viability. ` +
-      `For engineers building with the Cognitive Router pattern, this is relevant signal.\n\n` +
-      `### The Research\n\n` +
-      `The paper addresses ${paper.title}. Categories: ${paper.categories.join(', ')}. ` +
-      `Relevance score: ${paper.relevance_score.toFixed(2)}.\n\n` +
-      `This type of research ${paper.zone === 'red' ? 'significantly advances' : 'incrementally supports'} the thesis ` +
-      `that local inference can match or exceed cloud capabilities on targeted tasks.\n\n` +
-      `Limitations remain: this is a mock briefing in dev mode. Full analysis requires Tier 2 compilation.\n\n` +
-      `### Key Claims\n- ${topicLabel} findings suggest ${paper.zone === 'red' ? 'significant' : 'incremental'} progress\n\n` +
-      `### Caveats\n- Mock briefing — full analysis requires Tier 2\n\n` +
-      `### Thesis Signal\n🟢 **SUPPORTS DECENTRALIZED:** Evidence for local capability advancement.`,
-  }
+  const selected = content[voicePreset]
 
   return {
     id: crypto.randomUUID(),
     paper,
     voice_preset: voicePreset,
-    headline: headlines[voicePreset],
-    body: bodies[voicePreset],
-    key_claims: [`${topicLabel} findings suggest ${paper.zone === 'red' ? 'significant' : 'incremental'} progress`],
-    caveats: ['Mock briefing generated in dev mode — full analysis requires Tier 2'],
-    tier_migration_impact: paper.zone === 'red' ? 'High — potential timeline acceleration' : undefined,
+    headline: selected.headline,
+    lead: selected.lead,
+    analysis: selected.analysis,
+    thesis_signal: thesisSignal,
+    thesis_reason: thesisReason,
+    arxiv_url: paper.arxiv_url,
+    key_claims: [
+      `${topicLabel} findings suggest ${paper.zone === 'red' ? 'significant' : 'incremental'} progress`,
+      `Local inference capabilities continue to improve`,
+      `Cost trajectory favors decentralized deployment`,
+    ],
+    caveats: [
+      'Mock briefing generated in dev mode — full analysis requires Tier 2',
+      'Results should be verified against original paper',
+    ],
+    body: `${selected.lead}\n\n${selected.analysis}`, // Legacy field
     compiled_at: new Date().toISOString(),
     compiled_by: {
       tier: 0,

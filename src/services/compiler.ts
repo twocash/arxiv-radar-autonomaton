@@ -291,36 +291,43 @@ export function mockCompileBriefing(
 
   // Voice-specific headline generation
   const headlines: Record<VoicePresetId, string> = {
-    news_brief: paper.zone === 'red'
+    quick_scan: paper.zone === 'red'
       ? `Local AI just got a signal worth watching: ${paper.title.slice(0, 60)}`
       : `New ${topicLabel} research shifts the deployment calculus`,
-    technical_summary: paper.zone === 'red'
-      ? `[${zoneLabel}] Tier migration signal: ${paper.title.slice(0, 60)}`
-      : `[${zoneLabel}] ${paper.title.slice(0, 80)}`,
-    strategic_intel: paper.zone === 'red'
-      ? `Strategic signal: cost projection may need revision`
-      : `${topicLabel} — trajectory update`,
+    social_post: paper.zone === 'red'
+      ? `🔴 This just changed the game for local AI 👇`
+      : `New research in ${topicLabel} — here's what it means:`,
+    deep_analysis: paper.zone === 'red'
+      ? `Strategic signal: ${paper.title.slice(0, 60)}`
+      : `${topicLabel} — new evidence for the trajectory`,
   }
 
   // Voice-specific body generation
   const bodies: Record<VoicePresetId, string> = {
-    news_brief: `${voice.example_opening || ''}\n\n` +
+    quick_scan: `${voice.example_opening || ''}\n\n` +
       `This paper addresses ${paper.matched_topics.join(' and ')}. ` +
       `The findings suggest the gap between frontier and local capability ` +
       `continues to narrow on targeted tasks. ` +
-      `Watch for reproduction attempts and real-world deployment benchmarks.`,
-    technical_summary: `**Method:** ${paper.title}\n\n` +
-      `**Categories:** ${paper.categories.join(', ')}\n\n` +
-      `**Edge viability:** Classification pending full analysis. ` +
-      `Matched topics: ${paper.matched_topics.join(', ')}. ` +
+      `Watch for reproduction attempts.\n\n` +
+      `**Thesis:** 🟢 Supports Decentralized — More evidence that local inference is catching up.`,
+    social_post: `${voice.example_opening || ''}\n\n` +
+      `Key findings:\n` +
+      `• ${paper.matched_topics[0] || 'AI'} progress continues\n` +
+      `• Gap between local and frontier narrowing\n` +
+      `• Watch for real-world deployment\n\n` +
+      `🟢 More evidence that you don't need Big Cloud.`,
+    deep_analysis: `**Why This Matters:** ` +
+      `This paper on ${paper.matched_topics.join(' and ')} signals continued progress toward local AI viability. ` +
+      `For engineers building with the Cognitive Router pattern, this is relevant signal.\n\n` +
+      `### The Research\n\n` +
+      `The paper addresses ${paper.title}. Categories: ${paper.categories.join(', ')}. ` +
       `Relevance score: ${paper.relevance_score.toFixed(2)}.\n\n` +
-      `**Caveats:** Mock briefing — full analysis requires Tier 2 compilation.\n\n` +
-      `**Tier migration impact:** ${paper.zone === 'red' ? 'High — potential timeline acceleration' : 'Moderate — confirms existing trajectory'}.`,
-    strategic_intel: paper.zone === 'red'
-      ? `A development in ${topicLabel} may accelerate the tier migration timeline. ` +
-        `If confirmed, this changes the cost projection for local inference.`
-      : `Incremental progress in ${topicLabel}. ` +
-        `Trajectory holds. No change to current deployment timeline.`,
+      `This type of research ${paper.zone === 'red' ? 'significantly advances' : 'incrementally supports'} the thesis ` +
+      `that local inference can match or exceed cloud capabilities on targeted tasks.\n\n` +
+      `Limitations remain: this is a mock briefing in dev mode. Full analysis requires Tier 2 compilation.\n\n` +
+      `### Key Claims\n- ${topicLabel} findings suggest ${paper.zone === 'red' ? 'significant' : 'incremental'} progress\n\n` +
+      `### Caveats\n- Mock briefing — full analysis requires Tier 2\n\n` +
+      `### Thesis Signal\n🟢 **SUPPORTS DECENTRALIZED:** Evidence for local capability advancement.`,
   }
 
   return {

@@ -50,7 +50,7 @@ function App() {
   } = autonomaton
 
   // Voice preset state (will be moved to app state in future)
-  const [voicePreset, setVoicePreset] = useState<VoicePresetId>('news_brief')
+  const [voicePreset, setVoicePreset] = useState<VoicePresetId>('quick_scan')
 
   const hasError = pipeline.last_error !== null
   const hasCompletedCycle = flywheelStats.papers_seen > 0

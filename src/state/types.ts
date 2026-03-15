@@ -208,7 +208,7 @@ export const INITIAL_STATE: ArxivRadarState = {
     total_papers_this_cycle: 0,
     current_paper_index: 0,
   },
-  voice_preset: 'news_brief',
+  voice_preset: 'quick_scan',
   incoming_papers: [],
   classified_papers: [],
   pending_briefings: [],

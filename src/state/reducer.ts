@@ -51,6 +51,8 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
             current_stage: 'idle',
             is_polling: false,
             last_poll: new Date().toISOString(),
+            total_papers_this_cycle: 0,
+            current_paper_index: 0,
           },
         }
       }
@@ -62,6 +64,9 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
           current_stage: 'recognition',
           is_polling: false,
           last_poll: new Date().toISOString(),
+          // One-piece flow: track total papers for progress display
+          total_papers_this_cycle: newPapers.length,
+          current_paper_index: 0,
         },
         incoming_papers: newPapers,
         stats: {
@@ -93,6 +98,8 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     // =========================================================================
     
     case 'PAPER_CLASSIFIED': {
+      // ONE-PIECE FLOW: YELLOW/RED paper classified → immediately compile its briefing
+      // Don't wait for all papers to classify first
       const tier = action.paper.classified_by.tier
       return {
         ...state,
@@ -100,6 +107,12 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
         incoming_papers: state.incoming_papers.filter(
           p => p.arxiv_id !== action.paper.arxiv_id
         ),
+        // Immediately move to compilation for this paper's briefing
+        pipeline: {
+          ...state.pipeline,
+          current_stage: 'compilation',
+          current_paper_index: state.pipeline.current_paper_index + 1,
+        },
         stats: {
           ...state.stats,
           total_api_cost_usd: state.stats.total_api_cost_usd + (action.classification_cost_usd ?? 0),
@@ -111,18 +124,28 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     }
 
     case 'PAPER_ARCHIVED': {
+      // ONE-PIECE FLOW: GREEN paper archived → continue to next paper
+      // GREEN papers flow through silently without governance pause
       const tier = action.paper.classified_by.tier
+      const remainingIncoming = state.incoming_papers.filter(
+        p => p.arxiv_id !== action.paper.arxiv_id
+      )
+
       return {
         ...state,
         archived_papers: [...state.archived_papers, action.paper],
         // Remove from both queues — paper may come from either incoming (direct archive)
         // or classified (post-briefing archive)
-        incoming_papers: state.incoming_papers.filter(
-          p => p.arxiv_id !== action.paper.arxiv_id
-        ),
+        incoming_papers: remainingIncoming,
         classified_papers: state.classified_papers.filter(
           p => p.arxiv_id !== action.paper.arxiv_id
         ),
+        pipeline: {
+          ...state.pipeline,
+          current_paper_index: state.pipeline.current_paper_index + 1,
+          // If no more papers, cycle complete
+          current_stage: remainingIncoming.length === 0 ? 'idle' : state.pipeline.current_stage,
+        },
         stats: {
           ...state.stats,
           total_api_cost_usd: state.stats.total_api_cost_usd + (action.classification_cost_usd ?? 0),
@@ -162,6 +185,8 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     // =========================================================================
     
     case 'BRIEFING_APPROVED': {
+      // ONE-PIECE FLOW: After approving, return to recognition for next paper
+      // The human just made a governance decision — now continue the flow
       const draft = state.pending_briefings.find(b => b.id === action.briefingId)
       if (!draft) return state
 
@@ -175,24 +200,12 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
 
       const remainingPending = state.pending_briefings.filter(b => b.id !== action.briefingId)
 
-      // Determine next stage:
-      // - More briefings to approve → stay in approval
-      // - No more pending, but papers still need briefings → back to compilation
-      // - All done → execution
-      const papersWithBriefings = new Set([
-        ...remainingPending.map(b => b.paper.arxiv_id),
-        ...state.approved_briefings.map(b => b.paper.arxiv_id),
-        draft.paper.arxiv_id, // The one we just approved
-      ])
-      const papersNeedingBriefings = state.classified_papers.filter(
-        p => !papersWithBriefings.has(p.arxiv_id)
-      )
-
-      let nextStage: 'approval' | 'compilation' | 'execution' = 'execution'
-      if (remainingPending.length > 0) {
-        nextStage = 'approval'
-      } else if (papersNeedingBriefings.length > 0) {
-        nextStage = 'compilation'
+      // ONE-PIECE FLOW: Determine next stage
+      // - More incoming papers → back to recognition (process next paper)
+      // - No more papers → cycle complete (idle)
+      let nextStage: 'recognition' | 'idle' = 'idle'
+      if (state.incoming_papers.length > 0) {
+        nextStage = 'recognition'
       }
 
       return {
@@ -208,6 +221,7 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     }
 
     case 'BRIEFING_REJECTED': {
+      // ONE-PIECE FLOW: After rejecting, return to recognition for next paper
       const draft = state.pending_briefings.find(b => b.id === action.briefingId)
       if (!draft) return state
 
@@ -219,22 +233,12 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
 
       const remainingPending = state.pending_briefings.filter(b => b.id !== action.briefingId)
 
-      // Determine next stage (same logic as BRIEFING_APPROVED)
-      const papersWithBriefings = new Set([
-        ...remainingPending.map(b => b.paper.arxiv_id),
-        ...state.approved_briefings.map(b => b.paper.arxiv_id),
-        ...state.rejected_briefings.map(r => r.draft.paper.arxiv_id),
-        draft.paper.arxiv_id, // The one we just rejected
-      ])
-      const papersNeedingBriefings = state.classified_papers.filter(
-        p => !papersWithBriefings.has(p.arxiv_id)
-      )
-
-      let nextStage: 'approval' | 'compilation' | 'execution' = 'execution'
-      if (remainingPending.length > 0) {
-        nextStage = 'approval'
-      } else if (papersNeedingBriefings.length > 0) {
-        nextStage = 'compilation'
+      // ONE-PIECE FLOW: Determine next stage
+      // - More incoming papers → back to recognition (process next paper)
+      // - No more papers → cycle complete (idle)
+      let nextStage: 'recognition' | 'idle' = 'idle'
+      if (state.incoming_papers.length > 0) {
+        nextStage = 'recognition'
       }
 
       return {

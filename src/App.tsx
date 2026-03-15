@@ -55,17 +55,18 @@ function App() {
   const hasError = pipeline.last_error !== null
   const hasCompletedCycle = flywheelStats.papers_seen > 0
 
-  // Pipeline Progress stats — computed from current state
-  const totalPapersThisCycle = state.incoming_papers.length + state.classified_papers.length + state.archived_papers.length
-  const processedCount = state.classified_papers.length + state.archived_papers.length
+  // ONE-PIECE FLOW: Pipeline Progress stats from pipeline tracking
+  const totalPapersThisCycle = pipeline.total_papers_this_cycle
+  const processedCount = pipeline.current_paper_index
   const greenCount = state.archived_papers.length
-  const yellowCount = state.classified_papers.filter(p => p.zone === 'yellow').length
-  const redCount = state.classified_papers.filter(p => p.zone === 'red').length
+  // In one-piece flow, YELLOW/RED papers are approved immediately, so count from approved briefings
+  const yellowCount = state.approved_briefings.filter(b => b.paper.zone === 'yellow').length
+  const redCount = state.approved_briefings.filter(b => b.paper.zone === 'red').length
 
-  // Show progress dashboard during active pipeline stages (not idle, not approval)
+  // Show progress dashboard during active pipeline stages
+  // In one-piece flow, show during all active stages including approval
   const showPipelineProgress =
     pipeline.current_stage !== 'idle' &&
-    pipeline.current_stage !== 'approval' &&
     totalPapersThisCycle > 0
 
   const handleRun = useCallback((_query?: string) => {
@@ -161,10 +162,13 @@ function App() {
                 onReject={rejectSkillProposal}
               />
 
-              {/* Pending Governance */}
+              {/* Pending Governance — ONE-PIECE FLOW */}
               <PendingGovernance
                 briefings={pendingBriefings}
                 pipelineStage={pipeline.current_stage}
+                currentPaperIndex={pipeline.current_paper_index}
+                totalPapers={totalPapersThisCycle}
+                remainingPapers={state.incoming_papers.length}
                 onApprove={approveBriefing}
                 onReject={rejectBriefing}
               />

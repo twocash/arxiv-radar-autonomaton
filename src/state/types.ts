@@ -117,6 +117,9 @@ export interface PipelineStatus {
   is_polling: boolean
   last_poll: string | null
   last_error: string | null
+  // One-piece flow tracking
+  total_papers_this_cycle: number    // Papers fetched at start of cycle
+  current_paper_index: number        // Which paper we're processing (0-based)
 }
 
 export interface FlywheelStats {
@@ -199,6 +202,8 @@ export const INITIAL_STATE: ArxivRadarState = {
     is_polling: false,
     last_poll: null,
     last_error: null,
+    total_papers_this_cycle: 0,
+    current_paper_index: 0,
   },
   voice_preset: 'news_brief',
   incoming_papers: [],

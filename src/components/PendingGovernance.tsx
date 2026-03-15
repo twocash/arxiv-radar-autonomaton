@@ -1,8 +1,9 @@
 /**
- * PendingGovernance — Briefings awaiting human approval
+ * PendingGovernance — ONE-PIECE FLOW Governance Panel
  *
- * Central governance panel showing all pending briefings.
- * Each briefing card shows the paper, zone, and expandable provenance trace.
+ * Shows ONE briefing at a time for human approval.
+ * In one-piece flow, each YELLOW/RED paper halts here for governance
+ * before the next paper is processed.
  *
  * @license CC BY 4.0
  */
@@ -14,6 +15,9 @@ import { BriefingCard } from './BriefingCard'
 interface Props {
   briefings: DraftBriefing[]
   pipelineStage: PipelineStage
+  currentPaperIndex: number      // ONE-PIECE FLOW: Which paper we're on
+  totalPapers: number            // ONE-PIECE FLOW: Total papers this cycle
+  remainingPapers: number        // ONE-PIECE FLOW: Papers left to process
   onApprove: (briefingId: string) => void
   onReject: (briefingId: string, reason?: string) => void
 }
@@ -50,42 +54,61 @@ function getEmptyStateMessage(stage: PipelineStage): { title: string; subtitle: 
   }
 }
 
-export function PendingGovernance({ briefings, pipelineStage, onApprove, onReject }: Props) {
+export function PendingGovernance({
+  briefings,
+  pipelineStage,
+  currentPaperIndex,
+  totalPapers,
+  remainingPapers,
+  onApprove,
+  onReject,
+}: Props) {
   const emptyMessage = getEmptyStateMessage(pipelineStage)
-  const isActive = pipelineStage !== 'idle' && pipelineStage !== 'approval'
+  const isActive = pipelineStage !== 'idle'
+  const hasBriefing = briefings.length > 0
+
+  // ONE-PIECE FLOW: There should be at most 1 briefing
+  const currentBriefing = briefings[0]
 
   return (
     <div className="card">
+      {/* ONE-PIECE FLOW: Header shows paper progress */}
       <h2
         className="font-mono text-sm mb-4 flex items-center gap-2"
         style={{ color: 'var(--text-secondary)' }}
       >
-        <span>Pending Governance</span>
-        {briefings.length > 0 && (
-          <span
-            className="px-2 py-0.5 rounded-sm text-xs"
-            style={{
-              backgroundColor: 'rgba(232, 201, 74, 0.1)',
-              color: 'var(--zone-yellow-text)',
-            }}
-          >
-            {briefings.length}
-          </span>
-        )}
-        {isActive && briefings.length === 0 && (
-          <span
-            className="px-2 py-0.5 rounded-sm text-xs animate-pulse"
-            style={{
-              backgroundColor: 'rgba(212, 98, 26, 0.15)',
-              color: 'var(--accent)',
-            }}
-          >
-            {pipelineStage}
-          </span>
+        {hasBriefing ? (
+          <>
+            <span>Governance Required</span>
+            <span
+              className="px-2 py-0.5 rounded-sm text-xs"
+              style={{
+                backgroundColor: 'rgba(232, 201, 74, 0.1)',
+                color: 'var(--zone-yellow-text)',
+              }}
+            >
+              Paper {currentPaperIndex}/{totalPapers}
+            </span>
+          </>
+        ) : (
+          <>
+            <span>Pipeline Status</span>
+            {isActive && (
+              <span
+                className="px-2 py-0.5 rounded-sm text-xs animate-pulse"
+                style={{
+                  backgroundColor: 'rgba(212, 98, 26, 0.15)',
+                  color: 'var(--accent)',
+                }}
+              >
+                {pipelineStage}
+              </span>
+            )}
+          </>
         )}
       </h2>
 
-      {briefings.length === 0 ? (
+      {!hasBriefing ? (
         <div className="text-center py-8">
           <p
             className="font-mono text-sm mb-2"
@@ -101,15 +124,23 @@ export function PendingGovernance({ briefings, pipelineStage, onApprove, onRejec
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {briefings.map(briefing => (
-            <BriefingCard
-              key={briefing.id}
-              briefing={briefing}
-              onApprove={onApprove}
-              onReject={onReject}
-            />
-          ))}
+        <div>
+          {/* ONE-PIECE FLOW: Single briefing card */}
+          <BriefingCard
+            briefing={currentBriefing}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+
+          {/* ONE-PIECE FLOW: Show remaining papers */}
+          {remainingPapers > 0 && (
+            <p
+              className="font-mono text-xs mt-4 text-center"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {remainingPapers} paper{remainingPapers !== 1 ? 's' : ''} remaining after this
+            </p>
+          )}
         </div>
       )}
     </div>

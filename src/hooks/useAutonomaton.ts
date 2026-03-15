@@ -486,9 +486,9 @@ export function useAutonomaton() {
     }
   }, [state.pipeline.current_stage, state.pipeline.is_polling, state.settings.dev_mode, transition])
 
-  // --- RECOGNITION STAGE: Classify papers ---
+  // --- RECOGNITION STAGE: Classify ONE paper (One-Piece Flow) ---
   useEffect(() => {
-    const { current_stage } = state.pipeline
+    const { current_stage, current_paper_index, total_papers_this_cycle } = state.pipeline
     const hasUnresolved = state.jidoka_halts.some(h => !h.resolved)
 
     if (current_stage !== 'recognition') return
@@ -497,13 +497,9 @@ export function useAutonomaton() {
       return
     }
     if (state.incoming_papers.length === 0) {
-      // No more papers to classify — move to compilation
-      if (state.classified_papers.some(p => p.zone !== 'green')) {
-        transition({ type: 'SET_STAGE', stage: 'compilation' })
-      } else {
-        // All papers were green (archived) — go to idle
-        transition({ type: 'SET_STAGE', stage: 'idle' })
-      }
+      // ONE-PIECE FLOW: All papers processed — cycle complete
+      // The reducer handles stage transitions; we just log
+      console.log(`[Pipeline] Recognition: Cycle complete. ${total_papers_this_cycle} papers processed.`)
       return
     }
 
@@ -587,7 +583,7 @@ export function useAutonomaton() {
     transition,
   ])
 
-  // --- COMPILATION STAGE: Generate briefings ---
+  // --- COMPILATION STAGE: Generate briefing for ONE paper (One-Piece Flow) ---
   useEffect(() => {
     const { current_stage } = state.pipeline
     const hasUnresolved = state.jidoka_halts.some(h => !h.resolved)
@@ -598,7 +594,8 @@ export function useAutonomaton() {
       return
     }
 
-    // Find papers that need briefings (YELLOW/RED without pending briefing)
+    // ONE-PIECE FLOW: Should be exactly ONE paper needing a briefing
+    // (the one we just classified as YELLOW/RED)
     const papersNeedingBriefings = state.classified_papers.filter(paper => {
       const hasPendingBriefing = state.pending_briefings.some(
         b => b.paper.arxiv_id === paper.arxiv_id
@@ -607,13 +604,12 @@ export function useAutonomaton() {
     })
 
     if (papersNeedingBriefings.length === 0) {
-      // All briefings compiled — move to approval
-      if (state.pending_briefings.length > 0) {
-        console.log(`[Pipeline] Compilation: Complete, ${state.pending_briefings.length} briefings pending approval`)
-        transition({ type: 'SET_STAGE', stage: 'approval' })
+      // No papers need briefings — this shouldn't happen in one-piece flow
+      // but handle gracefully by returning to recognition
+      console.log('[Pipeline] Compilation: No papers need briefings, returning to recognition')
+      if (state.incoming_papers.length > 0) {
+        transition({ type: 'SET_STAGE', stage: 'recognition' })
       } else {
-        console.log('[Pipeline] Compilation: No briefings to approve, returning to idle')
-        // Nothing to approve — go to idle
         transition({ type: 'SET_STAGE', stage: 'idle' })
       }
       return
@@ -696,25 +692,26 @@ export function useAutonomaton() {
     }
   }, [state.jidoka_halts, state.pipeline.current_stage])
 
-  // --- EXECUTION STAGE: Complete pipeline cycle and restart ---
+  // --- IDLE STAGE: Cycle complete, ready for next run ---
+  // ONE-PIECE FLOW: No auto-restart. User clicks RUN when ready.
+  // The execution stage is no longer used — we go directly to idle.
   useEffect(() => {
-    const { current_stage } = state.pipeline
+    const { current_stage, total_papers_this_cycle } = state.pipeline
 
-    if (current_stage !== 'execution') return
+    if (current_stage !== 'idle') return
+    if (total_papers_this_cycle === 0) return // Initial idle, not post-cycle
 
-    // Execution stage: all briefings approved, cycle complete
-    // The Autonomaton is a continuous circuit — auto-restart the poll cycle
-    console.log(`[Pipeline] Execution: Cycle complete. ${state.approved_briefings.length} briefings approved.`)
-    console.log('[Pipeline] Execution: Restarting poll cycle...')
-
-    // Brief pause before next cycle (prevents UI flicker)
-    const timer = setTimeout(() => {
-      // Restart the circuit (through Andon Gate)
-      transition({ type: 'START_POLL' })
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [state.pipeline.current_stage, state.approved_briefings.length, transition])
+    // Log cycle completion
+    const greenCount = state.archived_papers.length
+    const yellowRedCount = state.approved_briefings.length + state.rejected_briefings.length
+    console.log(`[Pipeline] Cycle complete: ${greenCount} GREEN (archived), ${yellowRedCount} YELLOW/RED (reviewed)`)
+  }, [
+    state.pipeline.current_stage,
+    state.pipeline.total_papers_this_cycle,
+    state.archived_papers.length,
+    state.approved_briefings.length,
+    state.rejected_briefings.length,
+  ])
 
   // ==========================================================================
   // PIPELINE CONTROL — All use transition()
@@ -808,8 +805,9 @@ export function useAutonomaton() {
   }, [state.jidoka_halts])
 
   // Pipeline annotation — rich status text for GlassPipeline
+  // ONE-PIECE FLOW: Shows "Paper X/Y" progress
   const pipelineAnnotation = useMemo((): string => {
-    const { current_stage } = state.pipeline
+    const { current_stage, current_paper_index, total_papers_this_cycle } = state.pipeline
 
     if (hasUnresolvedHalts && unresolvedHalts[0]) {
       const halt = unresolvedHalts[0]
@@ -817,39 +815,34 @@ export function useAutonomaton() {
       return `HALTED — ${halt.trigger.replace(/_/g, ' ')}${paperRef}`
     }
 
+    // ONE-PIECE FLOW: Show paper progress across all active stages
+    const paperProgress = total_papers_this_cycle > 0
+      ? `Paper ${current_paper_index + 1}/${total_papers_this_cycle}`
+      : ''
+
     switch (current_stage) {
       case 'telemetry':
         return state.settings.dev_mode ? 'Loading 7 seed papers' : 'Fetching from arXiv...'
-      case 'recognition': {
-        const total = state.incoming_papers.length + state.classified_papers.length + state.archived_papers.length
-        const remaining = state.incoming_papers.length
-        const processed = total - remaining
-        return remaining > 0
-          ? `Classifying ${processed + 1}/${total}`
-          : 'Classification complete'
-      }
-      case 'compilation': {
-        const pending = state.classified_papers.length
-        return pending > 0
-          ? `Compiling briefing — ${pending} remaining`
-          : 'Compilation complete'
-      }
+      case 'recognition':
+        return paperProgress ? `${paperProgress} — classifying` : 'Classifying...'
+      case 'compilation':
+        return paperProgress ? `${paperProgress} — generating briefing` : 'Generating briefing...'
       case 'approval':
-        return `${state.pending_briefings.length} briefing${state.pending_briefings.length !== 1 ? 's' : ''} awaiting review`
-      case 'execution':
-        return 'Cycle complete — restarting...'
+        return paperProgress ? `${paperProgress} — governance required` : 'Governance required'
       case 'idle':
+        if (total_papers_this_cycle > 0) {
+          // Just finished a cycle
+          return `Cycle complete — ${total_papers_this_cycle} papers processed`
+        }
         return state.stats.papers_seen > 0 ? 'Awaiting new research' : 'Ready'
       default:
         return 'Ready'
     }
   }, [
     state.pipeline.current_stage,
+    state.pipeline.current_paper_index,
+    state.pipeline.total_papers_this_cycle,
     state.settings.dev_mode,
-    state.incoming_papers.length,
-    state.classified_papers.length,
-    state.archived_papers.length,
-    state.pending_briefings.length,
     state.stats.papers_seen,
     hasUnresolvedHalts,
     unresolvedHalts,

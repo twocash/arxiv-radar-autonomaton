@@ -268,6 +268,11 @@ function shouldCheckApiKey(state: AppState, action: CombinedAction): boolean {
 /**
  * Determine the target stage after an action.
  * Used to validate the transition makes sense.
+ *
+ * ONE-PIECE FLOW: Each paper flows through all stages before the next.
+ * - PAPER_CLASSIFIED → compilation (for this paper's briefing)
+ * - PAPER_ARCHIVED → stay in recognition (process next paper) or idle (done)
+ * - BRIEFING_APPROVED/REJECTED → recognition (process next paper) or idle (done)
  */
 export function getTargetStage(action: CombinedAction): PipelineStage | null {
   switch (action.type) {
@@ -276,11 +281,14 @@ export function getTargetStage(action: CombinedAction): PipelineStage | null {
     case 'POLL_COMPLETE':
       return 'recognition'
     case 'PAPER_CLASSIFIED':
-      return 'compilation' // Or stay in recognition if more papers
+      return 'compilation' // ONE-PIECE: Immediately compile this paper's briefing
+    case 'PAPER_ARCHIVED':
+      return 'recognition' // ONE-PIECE: Continue to next paper (reducer handles idle)
     case 'BRIEFING_COMPILED':
       return 'approval'
     case 'BRIEFING_APPROVED':
-      return 'execution'
+    case 'BRIEFING_REJECTED':
+      return 'recognition' // ONE-PIECE: Continue to next paper (reducer handles idle)
     case 'JIDOKA_HALT':
       return null // Special state, handled by halt logic
     case 'SET_STAGE':

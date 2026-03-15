@@ -540,7 +540,8 @@ export function useAutonomaton() {
 
     // Classify the paper
     classifyPaperService(nextPaper, state.skills, state.settings).then(result => {
-      processingRef.current.recognition = null
+      // Keep processingRef set during dispatch — the loop protects us
+      // Once stage moves (via PAPER_CLASSIFIED/ARCHIVED), effect returns early on re-fire
 
       // LOG ROUTING DECISION — makes Cognitive Router auditable
       dispatch({
@@ -571,6 +572,9 @@ export function useAutonomaton() {
         const kaizenProposal = generateKaizenProposal(result.jidokaHalt)
         dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: kaizenProposal })
       }
+
+      // NOW safe to reset — stage has moved, loop protects against re-entry
+      processingRef.current.recognition = null
     })
   }, [
     state.pipeline.current_stage,

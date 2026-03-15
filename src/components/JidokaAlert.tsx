@@ -30,6 +30,10 @@ function getTriggerLabel(trigger: JidokaEvent['trigger']): string {
       return 'New Signal Source'
     case 'malformed_data':
       return 'Data Integrity Check Failed'
+    case 'empty_result':
+      return 'No Papers Returned'
+    case 'invalid_transition':
+      return 'State Machine Violation'
     default:
       return String(trigger).replace(/_/g, ' ')
   }
@@ -49,6 +53,10 @@ function getTriggerDescription(trigger: JidokaEvent['trigger']): string {
       return 'A new research source is producing high-signal work. The system paused to let you decide if it\'s worth tracking.'
     case 'malformed_data':
       return 'Incoming data failed integrity checks. The system stopped rather than processing unreliable information.'
+    case 'empty_result':
+      return 'The data source returned nothing. The system stopped to investigate rather than silently continuing with no work.'
+    case 'invalid_transition':
+      return 'The pipeline tried to execute an action that isn\'t valid from the current state. This is the Andon Gate catching a logic bug.'
     default:
       return 'The system detected something outside its governance boundaries and stopped for your judgment.'
   }

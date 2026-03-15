@@ -92,16 +92,26 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
     // CLASSIFICATION
     // =========================================================================
     
-    case 'PAPER_CLASSIFIED':
+    case 'PAPER_CLASSIFIED': {
+      const tier = action.paper.classified_by.tier
       return {
         ...state,
         classified_papers: [...state.classified_papers, action.paper],
         incoming_papers: state.incoming_papers.filter(
           p => p.arxiv_id !== action.paper.arxiv_id
         ),
+        stats: {
+          ...state.stats,
+          total_api_cost_usd: state.stats.total_api_cost_usd + (action.classification_cost_usd ?? 0),
+          // Track Flywheel economics: T0 = free local, T2 = cloud costs money
+          tier0_classifications: tier === 0 ? state.stats.tier0_classifications + 1 : state.stats.tier0_classifications,
+          tier2_classifications: tier === 2 ? state.stats.tier2_classifications + 1 : state.stats.tier2_classifications,
+        },
       }
+    }
 
-    case 'PAPER_ARCHIVED':
+    case 'PAPER_ARCHIVED': {
+      const tier = action.paper.classified_by.tier
       return {
         ...state,
         archived_papers: [...state.archived_papers, action.paper],
@@ -113,7 +123,15 @@ export function reducer(state: ArxivRadarState, action: ArxivRadarAction): Arxiv
         classified_papers: state.classified_papers.filter(
           p => p.arxiv_id !== action.paper.arxiv_id
         ),
+        stats: {
+          ...state.stats,
+          total_api_cost_usd: state.stats.total_api_cost_usd + (action.classification_cost_usd ?? 0),
+          // Track Flywheel economics: T0 = free local, T2 = cloud costs money
+          tier0_classifications: tier === 0 ? state.stats.tier0_classifications + 1 : state.stats.tier0_classifications,
+          tier2_classifications: tier === 2 ? state.stats.tier2_classifications + 1 : state.stats.tier2_classifications,
+        },
       }
+    }
 
     // =========================================================================
     // COMPILATION

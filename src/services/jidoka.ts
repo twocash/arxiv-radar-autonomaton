@@ -207,6 +207,44 @@ export function getKaizenOptions(trigger: JidokaTrigger): KaizenOption[] {
         },
       ]
 
+    case 'empty_result':
+      return [
+        {
+          label: 'Switch to dev mode — run on 7 seed papers to verify pipeline works',
+          action: 'mode:dev',
+          is_recommended: true,
+        },
+        {
+          label: 'Retry with a simpler query — try single category (cs.LG only)',
+          action: 'retry:simple',
+          is_recommended: false,
+        },
+        {
+          label: 'Acknowledge and wait — arXiv may be temporarily unavailable',
+          action: 'acknowledge',
+          is_recommended: false,
+        },
+      ]
+
+    case 'invalid_transition':
+      return [
+        {
+          label: 'Reset pipeline — clear state and start fresh',
+          action: 'reset',
+          is_recommended: true,
+        },
+        {
+          label: 'Acknowledge and continue — trust the current state is recoverable',
+          action: 'acknowledge',
+          is_recommended: false,
+        },
+        {
+          label: 'Switch to dev mode — run with seed data to verify pipeline logic',
+          action: 'mode:dev',
+          is_recommended: false,
+        },
+      ]
+
     default:
       return [
         {
@@ -230,6 +268,8 @@ export function generateKaizenProposal(halt: JidokaEvent): KaizenProposal {
     unknown_entity: 'A new author or institution is producing work that scores highly on the strategic questions, but isn\'t on the watchlist. The pipeline stopped to ask: is this a new signal source worth tracking, or noise? Adding them to the watchlist means their future papers get automatic attention.',
     api_failure: 'The Tier 2 API is unreachable. The pipeline stopped — no fallback to degraded output, no cached guess, no silent retry. This is Digital Jidoka: the system tells you exactly what broke instead of pretending everything is fine. Tier 0 classification still works locally.',
     malformed_data: 'The arXiv API returned data the parser couldn\'t handle. Rather than processing partial or corrupted data and producing unreliable classifications, the pipeline stopped. The malformed payload is preserved in the telemetry trace for debugging.',
+    empty_result: 'The arXiv API returned zero papers. This is an abnormality requiring investigation — either the query format has a problem, arXiv is experiencing an outage, or the categories have changed. The pipeline stopped because "no papers" is a data anomaly, not a valid result to process silently.',
+    invalid_transition: 'The Andon Gate blocked an action that isn\'t valid from the current pipeline stage. This is a state machine violation — the system tried to do something out of sequence. The details show exactly which action was blocked and from which stage. This typically indicates a bug in the pipeline logic or an unexpected race condition.',
   }
 
   return {

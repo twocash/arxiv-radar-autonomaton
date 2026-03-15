@@ -37,11 +37,23 @@ const COST_PER_OUTPUT_TOKEN = 0.000015 // ~$15/1M
 // ANTHROPIC CLIENT
 // =============================================================================
 
+/**
+ * Create Anthropic client with Vite dev proxy
+ *
+ * Why absolute URL: The Anthropic SDK uses `new URL(path, baseURL)` internally.
+ * Relative paths like '/anthropic-api' fail because URL constructor requires
+ * a valid base. Using window.location.origin makes it work in any environment
+ * (localhost:5173 in dev, production domain in prod).
+ *
+ * Why Vite proxy: Browser CORS blocks direct calls to api.anthropic.com.
+ * Vite proxies /anthropic-api → https://api.anthropic.com with proper headers.
+ */
 function createClient(apiKey: string): Anthropic {
+  const baseURL = `${window.location.origin}/anthropic-api`
   return new Anthropic({
     apiKey,
-    baseURL: '/anthropic-api', // Vite dev proxy
-    dangerouslyAllowBrowser: true,
+    baseURL,
+    dangerouslyAllowBrowser: true, // Required for browser context
   })
 }
 
@@ -263,34 +275,63 @@ function extractCaveats(body: string): string[] {
 
 /**
  * Mock compilation for dev mode (no API call).
+ *
+ * Produces meaningfully different output per voice:
+ * - news_brief: ≤150 words, 8th grade, "what changed → why it matters → what to watch"
+ * - technical_summary: ≤250 words, ML background assumed, method/edge/caveats/tier impact
+ * - strategic_intel: ≤100 words, no technical details, business impact focus
  */
 export function mockCompileBriefing(
   paper: ClassifiedPaper,
   voicePreset: VoicePresetId
 ): DraftBriefing {
   const voice = getVoicePreset(voicePreset)
+  const topicLabel = paper.matched_topics[0] || 'AI research'
+  const zoneLabel = paper.zone.toUpperCase()
 
-  // Generate mock headline based on zone
-  const zoneHeadline = {
-    green: `Routine finding in ${paper.categories[0] || 'ML'}`,
-    yellow: `Notable development: ${paper.title.slice(0, 50)}...`,
-    red: `Strategic signal: ${paper.matched_topics[0] || 'tier migration'}`,
+  // Voice-specific headline generation
+  const headlines: Record<VoicePresetId, string> = {
+    news_brief: paper.zone === 'red'
+      ? `Local AI just got a signal worth watching: ${paper.title.slice(0, 60)}`
+      : `New ${topicLabel} research shifts the deployment calculus`,
+    technical_summary: paper.zone === 'red'
+      ? `[${zoneLabel}] Tier migration signal: ${paper.title.slice(0, 60)}`
+      : `[${zoneLabel}] ${paper.title.slice(0, 80)}`,
+    strategic_intel: paper.zone === 'red'
+      ? `Strategic signal: cost projection may need revision`
+      : `${topicLabel} — trajectory update`,
   }
 
-  // Generate mock body based on voice
-  const mockBody = voice.example_opening || `This paper addresses ${paper.matched_topics.join(', ')}. ` +
-    `The findings suggest implications for local AI deployment. ` +
-    `Further analysis recommended based on ${paper.zone.toUpperCase()} zone classification.`
+  // Voice-specific body generation
+  const bodies: Record<VoicePresetId, string> = {
+    news_brief: `${voice.example_opening || ''}\n\n` +
+      `This paper addresses ${paper.matched_topics.join(' and ')}. ` +
+      `The findings suggest the gap between frontier and local capability ` +
+      `continues to narrow on targeted tasks. ` +
+      `Watch for reproduction attempts and real-world deployment benchmarks.`,
+    technical_summary: `**Method:** ${paper.title}\n\n` +
+      `**Categories:** ${paper.categories.join(', ')}\n\n` +
+      `**Edge viability:** Classification pending full analysis. ` +
+      `Matched topics: ${paper.matched_topics.join(', ')}. ` +
+      `Relevance score: ${paper.relevance_score.toFixed(2)}.\n\n` +
+      `**Caveats:** Mock briefing — full analysis requires Tier 2 compilation.\n\n` +
+      `**Tier migration impact:** ${paper.zone === 'red' ? 'High — potential timeline acceleration' : 'Moderate — confirms existing trajectory'}.`,
+    strategic_intel: paper.zone === 'red'
+      ? `A development in ${topicLabel} may accelerate the tier migration timeline. ` +
+        `If confirmed, this changes the cost projection for local inference.`
+      : `Incremental progress in ${topicLabel}. ` +
+        `Trajectory holds. No change to current deployment timeline.`,
+  }
 
   return {
     id: crypto.randomUUID(),
     paper,
     voice_preset: voicePreset,
-    headline: zoneHeadline[paper.zone],
-    body: mockBody,
-    key_claims: [`Paper demonstrates ${paper.matched_topics[0] || 'relevant findings'}`],
-    caveats: ['Mock briefing generated in dev mode'],
-    tier_migration_impact: paper.zone === 'red' ? 'High impact on tier migration timeline' : undefined,
+    headline: headlines[voicePreset],
+    body: bodies[voicePreset],
+    key_claims: [`${topicLabel} findings suggest ${paper.zone === 'red' ? 'significant' : 'incremental'} progress`],
+    caveats: ['Mock briefing generated in dev mode — full analysis requires Tier 2'],
+    tier_migration_impact: paper.zone === 'red' ? 'High — potential timeline acceleration' : undefined,
     compiled_at: new Date().toISOString(),
     compiled_by: {
       tier: 0,

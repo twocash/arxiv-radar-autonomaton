@@ -256,12 +256,21 @@ export function devModeClassify(paper: ArxivPaper): ClassificationResult {
 
 /**
  * Create Anthropic client with Vite dev proxy
+ *
+ * Why absolute URL: The Anthropic SDK uses `new URL(path, baseURL)` internally.
+ * Relative paths like '/anthropic-api' fail because URL constructor requires
+ * a valid base. Using window.location.origin makes it work in any environment
+ * (localhost:5173 in dev, production domain in prod).
+ *
+ * Why Vite proxy: Browser CORS blocks direct calls to api.anthropic.com.
+ * Vite proxies /anthropic-api → https://api.anthropic.com with proper headers.
  */
 function createAnthropicClient(apiKey: string): Anthropic {
+  const baseURL = `${window.location.origin}/anthropic-api`
   return new Anthropic({
     apiKey,
-    baseURL: '/anthropic-api', // Vite dev proxy
-    dangerouslyAllowBrowser: true,
+    baseURL,
+    dangerouslyAllowBrowser: true, // Required for browser context
   })
 }
 

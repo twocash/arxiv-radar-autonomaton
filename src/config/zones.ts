@@ -107,6 +107,8 @@ export const JIDOKA_TRIGGERS = {
   unknown_high_signal_entity: true,  // New author/lab with RED-level relevance
   api_failure: true,           // No fallback. No degraded output. Stop.
   malformed_data: true,        // arXiv API returns unexpected structure. Stop.
+  empty_result: true,          // 0 papers returned — anomaly, not silence. Stop.
+  invalid_transition: true,    // State machine violation — action not valid from current stage
 } as const
 
 // =============================================================================

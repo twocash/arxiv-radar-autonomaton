@@ -16,6 +16,7 @@ interface Props {
   isPolling: boolean
   hasUnresolvedHalts?: boolean
   hasCompletedCycle?: boolean // True if papers have been processed before
+  annotation?: string // Rich annotation from orchestrator
 }
 
 const STAGES: { id: PipelineStage; label: string; shortLabel: string }[] = [
@@ -62,8 +63,10 @@ export function GlassPipeline({
   isPolling,
   hasUnresolvedHalts = false,
   hasCompletedCycle = false,
+  annotation,
 }: Props) {
-  const statusText = useMemo(() => {
+  // Internal fallback status text (used if no annotation provided)
+  const fallbackStatus = useMemo(() => {
     if (hasUnresolvedHalts) return 'HALTED — Awaiting resolution'
     switch (currentStage) {
       case 'telemetry': return 'Loading papers...'
@@ -76,6 +79,9 @@ export function GlassPipeline({
       default: return 'Ready'
     }
   }, [currentStage, hasUnresolvedHalts, hasCompletedCycle])
+
+  // Use annotation from orchestrator if provided (has better context)
+  const statusText = annotation || fallbackStatus
 
   return (
     <div

@@ -35,7 +35,7 @@ import { createJidokaHalt, createMissingApiKeyHalt } from '../services/jidoka'
 export type CombinedAction = ArxivRadarAction | AppAction
 
 // Type guard for PAPER_CLASSIFIED action
-function isPaperClassifiedAction(action: CombinedAction): action is { type: 'PAPER_CLASSIFIED'; paper: ClassifiedPaper } {
+function isPaperClassifiedAction(action: CombinedAction): action is { type: 'PAPER_CLASSIFIED'; paper: ClassifiedPaper; classification_cost_usd?: number } {
   return action.type === 'PAPER_CLASSIFIED'
 }
 

@@ -42,7 +42,8 @@ import { logTransition, logInvalidTransition } from '../lib/consoleLog'
 import * as telemetry from '../services/telemetry'
 import { generateKaizenProposal } from '../services/jidoka'
 import { runFlywheelScan } from '../services/flywheel'
-import { loadSeedPapers } from '../services/arxiv'
+import { loadSeedPapers, fetchArxivPapers } from '../services/arxiv'
+import { ARXIV_CATEGORIES, ARXIV_CONFIG } from '../config/defaults'
 import { classifyPaper as classifyPaperService } from '../services/classifier'
 import { compileBriefing, mockCompileBriefing } from '../services/compiler'
 
@@ -311,8 +312,8 @@ export function useAutonomaton() {
       const invalidHalt: JidokaEvent = {
         id: crypto.randomUUID(),
         stage: currentStage,
-        trigger: 'malformed_data', // State machine violation
-        details: `ANDON GATE: Blocked invalid transition "${action.type}" from ${currentStage} stage. This indicates a state machine bug that requires investigation.`,
+        trigger: 'invalid_transition', // State machine violation — distinct from parser errors
+        details: `ANDON GATE: Blocked "${action.type}" during ${currentStage} stage. This action is not valid from this state. Check the state machine definition or investigate why this action fired unexpectedly.`,
         timestamp: new Date().toISOString(),
         resolved: false,
       }
@@ -431,16 +432,59 @@ export function useAutonomaton() {
     if (current_stage !== 'telemetry' || !is_polling) return
     if (processingRef.current.telemetry) return
 
-    console.log('[Pipeline] Telemetry: Loading papers...')
     processingRef.current.telemetry = true
 
-    // Load papers (seed data in dev mode, arXiv API otherwise)
-    const papers = loadSeedPapers()
-    console.log(`[Pipeline] Telemetry: Loaded ${papers.length} papers`)
-    transition({ type: 'POLL_COMPLETE', papers })
+    if (state.settings.dev_mode) {
+      // DEV MODE: Seed data — sovereignty test (works offline)
+      console.log('[Pipeline] Telemetry: Loading seed papers (dev mode)...')
+      const papers = loadSeedPapers()
+      console.log(`[Pipeline] Telemetry: Loaded ${papers.length} seed papers`)
+      transition({ type: 'POLL_COMPLETE', papers })
+      processingRef.current.telemetry = false
+    } else {
+      // LIVE MODE: Fetch from arXiv API
+      console.log('[Pipeline] Telemetry: Fetching from arXiv...')
+      // Use space-separated OR (URLSearchParams will encode spaces as +, which arXiv understands)
+      const categoryQuery = ARXIV_CATEGORIES.map(c => `cat:${c}`).join(' OR ')
+      fetchArxivPapers(categoryQuery, ARXIV_CONFIG.maxResultsPerPoll)
+        .then(papers => {
+          console.log(`[Pipeline] Telemetry: Fetched ${papers.length} papers from arXiv`)
+          processingRef.current.telemetry = false
 
-    processingRef.current.telemetry = false
-  }, [state.pipeline.current_stage, state.pipeline.is_polling, transition])
+          // NO SILENT FAILURES: 0 papers is an abnormality that requires investigation
+          if (papers.length === 0) {
+            const halt: JidokaEvent = {
+              id: crypto.randomUUID(),
+              stage: 'telemetry',
+              trigger: 'empty_result',
+              details: `arXiv returned 0 papers. Query: "${categoryQuery}". This may indicate a query format issue, API change, or temporary arXiv outage.`,
+              timestamp: new Date().toISOString(),
+              resolved: false,
+            }
+            dispatch({ type: 'JIDOKA_HALT', event: halt })
+            dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: generateKaizenProposal(halt) })
+            return
+          }
+
+          transition({ type: 'POLL_COMPLETE', papers })
+        })
+        .catch(error => {
+          console.error('[Pipeline] Telemetry: arXiv fetch failed:', error)
+          processingRef.current.telemetry = false
+          const errorMsg = error instanceof Error ? error.message : 'Unknown fetch error'
+          const halt: JidokaEvent = {
+            id: crypto.randomUUID(),
+            stage: 'telemetry',
+            trigger: 'api_failure',
+            details: `arXiv fetch failed: ${errorMsg}`,
+            timestamp: new Date().toISOString(),
+            resolved: false,
+          }
+          dispatch({ type: 'JIDOKA_HALT', event: halt })
+          dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: generateKaizenProposal(halt) })
+        })
+    }
+  }, [state.pipeline.current_stage, state.pipeline.is_polling, state.settings.dev_mode, transition])
 
   // --- RECOGNITION STAGE: Classify papers ---
   useEffect(() => {
@@ -502,14 +546,26 @@ export function useAutonomaton() {
     classifyPaperService(nextPaper, state.skills, state.settings).then(result => {
       processingRef.current.recognition = null
 
+      // LOG ROUTING DECISION — makes Cognitive Router auditable
+      dispatch({
+        type: 'TELEMETRY_LOGGED',
+        entry: telemetry.createTelemetryEntry('recognition', 'routing_decision', {
+          arxiv_id: nextPaper.arxiv_id,
+          tier: result.tier === 'T0-skill' ? 0 : result.tier === 'T0-keyword' ? 0 : result.tier === 'T2' ? 2 : 0,
+          details: `Tier ${result.tier}: ${result.tier === 'T0-skill' ? 'Skill match' : result.tier === 'T0-keyword' ? 'Keyword threshold met' : result.tier === 'T2' ? 'LLM classification' : 'Dev mode mock'}`,
+          confidence: result.paper?.relevance_score,
+          cost_usd: result.cost_usd ?? 0,
+        }),
+      })
+
       if (result.success && result.paper) {
         console.log(`[Pipeline] Recognition: ${nextPaper.arxiv_id} → ${result.paper.zone.toUpperCase()}`)
         if (result.paper.zone === 'green') {
           // Auto-archive GREEN papers
-          transition({ type: 'PAPER_ARCHIVED', paper: result.paper })
+          transition({ type: 'PAPER_ARCHIVED', paper: result.paper, classification_cost_usd: result.cost_usd })
         } else {
           // YELLOW/RED papers need briefings
-          transition({ type: 'PAPER_CLASSIFIED', paper: result.paper })
+          transition({ type: 'PAPER_CLASSIFIED', paper: result.paper, classification_cost_usd: result.cost_usd })
         }
       } else if (result.jidokaHalt) {
         console.log(`[Pipeline] Recognition: ${nextPaper.arxiv_id} → JIDOKA (${result.jidokaHalt.trigger})`)
@@ -751,6 +807,54 @@ export function useAutonomaton() {
     return state.jidoka_halts.filter(h => !h.resolved)
   }, [state.jidoka_halts])
 
+  // Pipeline annotation — rich status text for GlassPipeline
+  const pipelineAnnotation = useMemo((): string => {
+    const { current_stage } = state.pipeline
+
+    if (hasUnresolvedHalts && unresolvedHalts[0]) {
+      const halt = unresolvedHalts[0]
+      const paperRef = halt.paper_id ? ` — paper ${halt.paper_id}` : ''
+      return `HALTED — ${halt.trigger.replace(/_/g, ' ')}${paperRef}`
+    }
+
+    switch (current_stage) {
+      case 'telemetry':
+        return state.settings.dev_mode ? 'Loading 7 seed papers' : 'Fetching from arXiv...'
+      case 'recognition': {
+        const total = state.incoming_papers.length + state.classified_papers.length + state.archived_papers.length
+        const remaining = state.incoming_papers.length
+        const processed = total - remaining
+        return remaining > 0
+          ? `Classifying ${processed + 1}/${total}`
+          : 'Classification complete'
+      }
+      case 'compilation': {
+        const pending = state.classified_papers.length
+        return pending > 0
+          ? `Compiling briefing — ${pending} remaining`
+          : 'Compilation complete'
+      }
+      case 'approval':
+        return `${state.pending_briefings.length} briefing${state.pending_briefings.length !== 1 ? 's' : ''} awaiting review`
+      case 'execution':
+        return 'Cycle complete — restarting...'
+      case 'idle':
+        return state.stats.papers_seen > 0 ? 'Awaiting new research' : 'Ready'
+      default:
+        return 'Ready'
+    }
+  }, [
+    state.pipeline.current_stage,
+    state.settings.dev_mode,
+    state.incoming_papers.length,
+    state.classified_papers.length,
+    state.archived_papers.length,
+    state.pending_briefings.length,
+    state.stats.papers_seen,
+    hasUnresolvedHalts,
+    unresolvedHalts,
+  ])
+
   // ==========================================================================
   // RETURN — Note: dispatch is NOT exposed. Only transition.
   // ==========================================================================
@@ -791,6 +895,9 @@ export function useAutonomaton() {
     unresolvedHalts,
     kaizenProposals: state.kaizen_proposals,
     resolveJidoka,
+
+    // Pipeline annotation (rich status for GlassPipeline)
+    pipelineAnnotation,
 
     // Settings
     settings: state.settings,

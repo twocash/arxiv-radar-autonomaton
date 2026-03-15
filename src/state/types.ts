@@ -30,7 +30,7 @@ export type PipelineStage =
 export interface JidokaEvent {
   id: string
   stage: PipelineStage
-  trigger: 'confidence_below_threshold' | 'conflicting_thesis' | 'unknown_entity' | 'api_failure' | 'malformed_data'
+  trigger: 'confidence_below_threshold' | 'conflicting_thesis' | 'unknown_entity' | 'api_failure' | 'malformed_data' | 'empty_result' | 'invalid_transition'
   details: string
   paper_id?: string
   timestamp: string
@@ -125,6 +125,9 @@ export interface FlywheelStats {
   briefings_approved: number
   briefings_rejected: number
   total_api_cost_usd: number
+  // Real-time classification tracking for Flywheel economics visibility
+  tier0_classifications: number  // Papers classified by T0 (free, instant)
+  tier2_classifications: number  // Papers classified by T2 (cloud, costs money)
 }
 
 export interface ArxivRadarState {
@@ -160,8 +163,8 @@ export type ArxivRadarAction =
   | { type: 'SET_STAGE'; stage: PipelineStage }
   
   // Classification
-  | { type: 'PAPER_CLASSIFIED'; paper: ClassifiedPaper }
-  | { type: 'PAPER_ARCHIVED'; paper: ClassifiedPaper }
+  | { type: 'PAPER_CLASSIFIED'; paper: ClassifiedPaper; classification_cost_usd?: number }
+  | { type: 'PAPER_ARCHIVED'; paper: ClassifiedPaper; classification_cost_usd?: number }
   
   // Compilation
   | { type: 'BRIEFING_COMPILED'; briefing: DraftBriefing }
@@ -211,5 +214,7 @@ export const INITIAL_STATE: ArxivRadarState = {
     briefings_approved: 0,
     briefings_rejected: 0,
     total_api_cost_usd: 0,
+    tier0_classifications: 0,
+    tier2_classifications: 0,
   },
 }

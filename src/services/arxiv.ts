@@ -7,6 +7,7 @@
  */
 
 import type { ArxivPaper } from '../state/types'
+import { ARXIV_CONFIG } from '../config/defaults'
 import samplePapers from '../seed/sample-papers.json'
 
 // =============================================================================
@@ -67,8 +68,8 @@ export function getJidokaTestPaper(): ArxivPaper | undefined {
 // ARXIV API — Live Mode (Future Implementation)
 // =============================================================================
 
-/** arXiv API base URL */
-const ARXIV_API_BASE = 'https://export.arxiv.org/api/query'
+/** arXiv API base URL (proxied through Vite to avoid CORS) */
+const ARXIV_API_BASE = '/arxiv-api/api/query'
 
 /** Default query parameters */
 const DEFAULT_QUERY_PARAMS = {
@@ -79,18 +80,27 @@ const DEFAULT_QUERY_PARAMS = {
 
 /**
  * Fetch papers from arXiv API
- *
- * TODO: Implement in Epic 7 when API integration is added
- * For now, returns seed papers in dev mode
  */
 export async function fetchArxivPapers(
   query: string,
   maxResults: number = 50
 ): Promise<ArxivPaper[]> {
-  // Placeholder for future arXiv API integration
-  // In dev mode or when API fails, returns seed papers
-  console.warn('[arXiv] API fetch not yet implemented. Returning seed papers.')
-  return loadSeedPapers()
+  const url = buildQueryUrl(query, maxResults)
+
+  // Rate limit: arXiv requests 1 second delay between requests
+  await new Promise(resolve => setTimeout(resolve, ARXIV_CONFIG.rateLimitDelayMs))
+
+  console.log(`[arXiv] Fetching: ${url}`)
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`arXiv API returned ${response.status}: ${response.statusText}`)
+  }
+
+  const xml = await response.text()
+  const papers = parseArxivResponse(xml)
+  console.log(`[arXiv] Parsed ${papers.length} papers`)
+  return papers
 }
 
 /**
@@ -109,11 +119,62 @@ export function buildQueryUrl(query: string, maxResults: number): string {
 
 /**
  * Parse arXiv API Atom XML response into papers
- *
- * TODO: Implement XML parsing in Epic 7
  */
 export function parseArxivResponse(xml: string): ArxivPaper[] {
-  // Placeholder - will parse Atom XML format
-  console.warn('[arXiv] XML parsing not yet implemented.')
-  return []
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(xml, 'application/xml')
+
+  // Check for parse errors
+  const parseError = doc.querySelector('parsererror')
+  if (parseError) {
+    throw new Error(`XML parse error: ${parseError.textContent?.slice(0, 200)}`)
+  }
+
+  const entries = doc.querySelectorAll('entry')
+
+  return Array.from(entries).map(entry => {
+    const rawId = entry.querySelector('id')?.textContent ?? ''
+    // arXiv IDs come as URLs: http://arxiv.org/abs/2506.01234v1
+    // Strip to just the ID portion
+    const arxivId = rawId
+      .replace('http://arxiv.org/abs/', '')
+      .replace('https://arxiv.org/abs/', '')
+      .replace(/v\d+$/, '') // Strip version suffix
+
+    const title = (entry.querySelector('title')?.textContent ?? '')
+      .trim()
+      .replace(/\s+/g, ' ') // Collapse whitespace/newlines
+
+    const abstract = (entry.querySelector('summary')?.textContent ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+
+    const authors = Array.from(entry.querySelectorAll('author name'))
+      .map(n => n.textContent?.trim() ?? '')
+      .filter(Boolean)
+
+    const categories = Array.from(entry.querySelectorAll('category'))
+      .map(c => c.getAttribute('term') ?? '')
+      .filter(Boolean)
+
+    const published = entry.querySelector('published')?.textContent ?? ''
+    const updated = entry.querySelector('updated')?.textContent ?? published
+
+    // PDF link from <link> elements
+    const links = Array.from(entry.querySelectorAll('link'))
+    const pdfLink = links.find(l => l.getAttribute('title') === 'pdf')
+    const pdfUrl = pdfLink?.getAttribute('href') ?? `https://arxiv.org/pdf/${arxivId}`
+
+    return {
+      arxiv_id: arxivId,
+      title,
+      abstract,
+      authors,
+      categories,
+      published,
+      updated,
+      pdf_url: pdfUrl,
+      arxiv_url: `https://arxiv.org/abs/${arxivId}`,
+    }
+  })
 }

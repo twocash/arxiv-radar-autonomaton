@@ -18,6 +18,8 @@ import { PendingGovernance } from './components/PendingGovernance'
 import { SkillsLibrary } from './components/SkillsLibrary'
 import { SettingsPanel } from './components/SettingsPanel'
 import { PipelineTrace } from './components/PipelineTrace'
+import { WelcomeCard } from './components/WelcomeCard'
+import { PipelineProgress } from './components/PipelineProgress'
 import type { VoicePresetId } from './config/voices'
 
 function App() {
@@ -44,6 +46,7 @@ function App() {
     resolveJidoka,
     updateSettings,
     transition,
+    pipelineAnnotation,
   } = autonomaton
 
   // Voice preset state (will be moved to app state in future)
@@ -51,6 +54,19 @@ function App() {
 
   const hasError = pipeline.last_error !== null
   const hasCompletedCycle = flywheelStats.papers_seen > 0
+
+  // Pipeline Progress stats — computed from current state
+  const totalPapersThisCycle = state.incoming_papers.length + state.classified_papers.length + state.archived_papers.length
+  const processedCount = state.classified_papers.length + state.archived_papers.length
+  const greenCount = state.archived_papers.length
+  const yellowCount = state.classified_papers.filter(p => p.zone === 'yellow').length
+  const redCount = state.classified_papers.filter(p => p.zone === 'red').length
+
+  // Show progress dashboard during active pipeline stages (not idle, not approval)
+  const showPipelineProgress =
+    pipeline.current_stage !== 'idle' &&
+    pipeline.current_stage !== 'approval' &&
+    totalPapersThisCycle > 0
 
   const handleRun = useCallback((_query?: string) => {
     startPipeline()
@@ -97,6 +113,7 @@ function App() {
           isPolling={pipeline.is_polling}
           hasUnresolvedHalts={hasUnresolvedHalts}
           hasCompletedCycle={hasCompletedCycle}
+          annotation={pipelineAnnotation}
         />
 
         {/* Two-column body — fills remaining viewport height */}
@@ -107,6 +124,11 @@ function App() {
             style={{ paddingLeft: '40px', paddingRight: '40px' }}
           >
             <div style={{ maxWidth: '720px' }}>
+              {/* Welcome Card — first run only */}
+              {state.stats.papers_seen === 0 && pipeline.current_stage === 'idle' && (
+                <WelcomeCard settings={settings} />
+              )}
+
               {/* Jidoka Alert */}
               {hasUnresolvedHalts && currentHalt && (
                 <JidokaAlert
@@ -114,6 +136,21 @@ function App() {
                   kaizenProposal={currentKaizen}
                   onResolve={resolveJidoka}
                   onSelectKaizen={handleKaizenSelect}
+                />
+              )}
+
+              {/* Pipeline Progress — real-time Flywheel economics */}
+              {showPipelineProgress && (
+                <PipelineProgress
+                  totalPapers={totalPapersThisCycle}
+                  processedCount={processedCount}
+                  greenCount={greenCount}
+                  yellowCount={yellowCount}
+                  redCount={redCount}
+                  tier0Count={state.stats.tier0_classifications}
+                  tier2Count={state.stats.tier2_classifications}
+                  apiCost={state.stats.total_api_cost_usd}
+                  currentStage={pipeline.current_stage}
                 />
               )}
 
@@ -127,6 +164,7 @@ function App() {
               {/* Pending Governance */}
               <PendingGovernance
                 briefings={pendingBriefings}
+                pipelineStage={pipeline.current_stage}
                 onApprove={approveBriefing}
                 onReject={rejectBriefing}
               />

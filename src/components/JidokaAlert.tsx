@@ -9,13 +9,14 @@
  * @license CC BY 4.0
  */
 
-import type { JidokaEvent, KaizenProposal } from '../types/app'
+import type { JidokaEvent, KaizenProposal, TelemetryEntry } from '../types/app'
 
 interface Props {
   halt: JidokaEvent
   kaizenProposal?: KaizenProposal
   onResolve: (eventId: string, resolution: string) => void
   onSelectKaizen?: (proposalId: string, optionAction: string) => void
+  traceContext?: TelemetryEntry[] // Telemetry entries for this paper
 }
 
 function getTriggerLabel(trigger: JidokaEvent['trigger']): string {
@@ -62,7 +63,7 @@ function getTriggerDescription(trigger: JidokaEvent['trigger']): string {
   }
 }
 
-export function JidokaAlert({ halt, kaizenProposal, onResolve, onSelectKaizen }: Props) {
+export function JidokaAlert({ halt, kaizenProposal, onResolve, onSelectKaizen, traceContext = [] }: Props) {
   const hasKaizen = kaizenProposal && kaizenProposal.options.length > 0
 
   return (
@@ -191,6 +192,40 @@ export function JidokaAlert({ halt, kaizenProposal, onResolve, onSelectKaizen }:
             Acknowledge & Continue
           </button>
         </div>
+      )}
+
+      {/* Pipeline Trace Context — telemetry for this paper */}
+      {traceContext.length > 0 && (
+        <details className="mb-3">
+          <summary
+            className="font-mono text-[10px] cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            pipeline trace context ({traceContext.length} events)
+          </summary>
+          <div
+            className="mt-1 px-3 py-2 rounded-sm max-h-32 overflow-y-auto"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+          >
+            {traceContext.map((entry, i) => (
+              <div
+                key={i}
+                className="font-mono text-[10px] py-0.5"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <span style={{ color: 'var(--accent)' }}>
+                  {new Date(entry.ts).toLocaleTimeString()}
+                </span>
+                {' '}{entry.event}
+                {entry.confidence !== undefined && (
+                  <span style={{ color: 'var(--zone-yellow-text)' }}>
+                    {' '}(conf: {entry.confidence.toFixed(2)})
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {/* Provenance metadata — bottom of the alert */}

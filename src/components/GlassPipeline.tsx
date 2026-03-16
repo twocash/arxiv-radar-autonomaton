@@ -17,6 +17,7 @@ interface Props {
   hasUnresolvedHalts?: boolean
   hasCompletedCycle?: boolean // True if papers have been processed before
   annotation?: string // Rich annotation from orchestrator
+  activeZone?: 'green' | 'yellow' | 'red' | null // Zone of paper being processed
 }
 
 const STAGES: { id: PipelineStage; label: string; shortLabel: string }[] = [
@@ -57,6 +58,23 @@ function StageIcon({ status }: { status: StageStatus }) {
   }
 }
 
+
+/**
+ * Get zone-aware colors for active stages.
+ */
+function getActiveColors(zone: 'green' | 'yellow' | 'red' | null | undefined): { bg: string; text: string } {
+  switch (zone) {
+    case 'yellow':
+      return { bg: 'rgba(217, 164, 6, 0.15)', text: 'var(--zone-yellow-text, #D9A406)' };
+    case 'red':
+      return { bg: 'rgba(232, 90, 58, 0.15)', text: 'var(--zone-red-text, #E85A3A)' };
+    case 'green':
+      return { bg: 'rgba(94, 191, 80, 0.15)', text: 'var(--zone-green-text, #5EBF50)' };
+    default:
+      return { bg: 'rgba(212, 98, 26, 0.1)', text: 'var(--accent)' };
+  }
+}
+
 export function GlassPipeline({
   currentStage,
   hasError,
@@ -64,7 +82,10 @@ export function GlassPipeline({
   hasUnresolvedHalts = false,
   hasCompletedCycle = false,
   annotation,
+  activeZone,
 }: Props) {
+  const zoneColors = getActiveColors(activeZone)
+
   // Internal fallback status text (used if no annotation provided)
   const fallbackStatus = useMemo(() => {
     if (hasUnresolvedHalts) return 'HALTED — Awaiting resolution'
@@ -115,7 +136,7 @@ export function GlassPipeline({
               style={{
                 backgroundColor:
                   status === 'active'
-                    ? 'rgba(212, 98, 26, 0.1)'
+                    ? zoneColors.bg
                     : status === 'halt'
                       ? 'rgba(232, 90, 58, 0.1)'
                       : status === 'complete'
@@ -131,7 +152,7 @@ export function GlassPipeline({
                     status === 'complete'
                       ? 'var(--zone-green-text)'
                       : status === 'active'
-                        ? 'var(--accent)'
+                        ? zoneColors.text
                         : status === 'halt'
                           ? 'var(--zone-red-text)'
                           : 'var(--text-muted)',
@@ -146,7 +167,7 @@ export function GlassPipeline({
                     status === 'complete'
                       ? 'var(--zone-green-text)'
                       : status === 'active'
-                        ? 'var(--accent)'
+                        ? zoneColors.text
                         : status === 'halt'
                           ? 'var(--zone-red-text)'
                           : 'var(--text-muted)',

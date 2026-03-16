@@ -7,7 +7,7 @@
  * @license CC BY 4.0
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useAutonomaton, AutonomatonContext } from './hooks/useAutonomaton'
 import { CommandBar } from './components/CommandBar'
 import { GlassPipeline } from './components/GlassPipeline'
@@ -100,6 +100,25 @@ function App() {
     ? kaizenProposals.find(k => k.jidoka_event_id === currentHalt.id)
     : undefined
 
+  // ZONE VISUALIZATION: Derive active paper's zone for pipeline coloring
+  const activePaperZone = useMemo(() => {
+    if (pipeline.current_stage === 'idle' || pipeline.current_stage === 'telemetry') return null
+    // During approval, show the pending briefing's zone
+    if (pendingBriefings.length > 0) return pendingBriefings[0].paper.zone
+    // During recognition/compilation, show the paper being processed
+    if (state.classified_papers.length > 0) return state.classified_papers[0].zone
+    return null
+  }, [pipeline.current_stage, pendingBriefings, state.classified_papers])
+
+  // JIDOKA TRACE CONTEXT: Filter telemetry for current halt's paper
+  const currentHaltContext = useMemo(() => {
+    if (!currentHalt?.paper_id) return []
+    return telemetryLog.filter(entry =>
+      entry.arxiv_id === currentHalt.paper_id ||
+      entry.event === 'invalid_transition'
+    )
+  }, [currentHalt, telemetryLog])
+
   return (
     <AutonomatonContext.Provider value={autonomaton}>
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -122,6 +141,7 @@ function App() {
           hasUnresolvedHalts={hasUnresolvedHalts}
           hasCompletedCycle={hasCompletedCycle}
           annotation={pipelineAnnotation}
+          activeZone={activePaperZone}
         />
 
         {/* Two-column body — fills remaining viewport height */}
@@ -187,6 +207,7 @@ function App() {
                       kaizenProposal={currentKaizen}
                       onResolve={resolveJidoka}
                       onSelectKaizen={handleKaizenSelect}
+                      traceContext={currentHaltContext}
                     />
                   )}
 

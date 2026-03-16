@@ -15,12 +15,16 @@ import { FlywheelFooter } from './components/FlywheelFooter'
 import { JidokaAlert } from './components/JidokaAlert'
 import { SkillProposals } from './components/SkillProposals'
 import { PendingGovernance } from './components/PendingGovernance'
+import { LibraryView } from './components/LibraryView'
 import { SkillsLibrary } from './components/SkillsLibrary'
 import { SettingsPanel } from './components/SettingsPanel'
 import { PipelineTrace } from './components/PipelineTrace'
 import { WelcomeCard } from './components/WelcomeCard'
 import { PipelineProgress } from './components/PipelineProgress'
 import type { VoicePresetId } from './config/voices'
+
+// Tab options for main content area
+type ContentTab = 'processing' | 'library'
 
 function App() {
   const autonomaton = useAutonomaton()
@@ -51,6 +55,9 @@ function App() {
 
   // Voice preset state (will be moved to app state in future)
   const [voicePreset, setVoicePreset] = useState<VoicePresetId>('quick_scan')
+
+  // Tab state for main content area
+  const [activeTab, setActiveTab] = useState<ContentTab>('processing')
 
   const hasError = pipeline.last_error !== null
   const hasCompletedCycle = flywheelStats.papers_seen > 0
@@ -125,53 +132,100 @@ function App() {
             style={{ paddingLeft: '40px', paddingRight: '40px' }}
           >
             <div style={{ maxWidth: '720px' }}>
-              {/* Welcome Card — first run only */}
-              {state.stats.papers_seen === 0 && pipeline.current_stage === 'idle' && (
-                <WelcomeCard settings={settings} />
+              {/* Tab Navigation */}
+              <div
+                className="flex gap-1 mb-4 border-b"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <button
+                  className="px-4 py-2 font-mono text-sm transition-colors"
+                  style={{
+                    color: activeTab === 'processing' ? 'var(--accent)' : 'var(--text-muted)',
+                    borderBottom: activeTab === 'processing' ? '2px solid var(--accent)' : '2px solid transparent',
+                    marginBottom: '-1px',
+                  }}
+                  onClick={() => setActiveTab('processing')}
+                >
+                  Processing
+                </button>
+                <button
+                  className="px-4 py-2 font-mono text-sm transition-colors flex items-center gap-2"
+                  style={{
+                    color: activeTab === 'library' ? 'var(--accent)' : 'var(--text-muted)',
+                    borderBottom: activeTab === 'library' ? '2px solid var(--accent)' : '2px solid transparent',
+                    marginBottom: '-1px',
+                  }}
+                  onClick={() => setActiveTab('library')}
+                >
+                  Library
+                  {state.approved_briefings.length > 0 && (
+                    <span
+                      className="px-1.5 py-0.5 rounded-sm text-[10px]"
+                      style={{
+                        backgroundColor: 'rgba(94, 191, 80, 0.1)',
+                        color: 'var(--zone-green-text)',
+                      }}
+                    >
+                      {state.approved_briefings.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              {activeTab === 'processing' ? (
+                <>
+                  {/* Welcome Card — first run only */}
+                  {state.stats.papers_seen === 0 && pipeline.current_stage === 'idle' && (
+                    <WelcomeCard settings={settings} />
+                  )}
+
+                  {/* Jidoka Alert */}
+                  {hasUnresolvedHalts && currentHalt && (
+                    <JidokaAlert
+                      halt={currentHalt}
+                      kaizenProposal={currentKaizen}
+                      onResolve={resolveJidoka}
+                      onSelectKaizen={handleKaizenSelect}
+                    />
+                  )}
+
+                  {/* Pipeline Progress — real-time Flywheel economics */}
+                  {showPipelineProgress && (
+                    <PipelineProgress
+                      totalPapers={totalPapersThisCycle}
+                      processedCount={processedCount}
+                      greenCount={greenCount}
+                      yellowCount={yellowCount}
+                      redCount={redCount}
+                      tier0Count={state.stats.tier0_classifications}
+                      tier2Count={state.stats.tier2_classifications}
+                      apiCost={state.stats.total_api_cost_usd}
+                      currentStage={pipeline.current_stage}
+                    />
+                  )}
+
+                  {/* Skill Proposals */}
+                  <SkillProposals
+                    proposals={skillProposals}
+                    onApprove={approveSkillProposal}
+                    onReject={rejectSkillProposal}
+                  />
+
+                  {/* Pending Governance — ONE-PIECE FLOW */}
+                  <PendingGovernance
+                    briefings={pendingBriefings}
+                    pipelineStage={pipeline.current_stage}
+                    currentPaperIndex={pipeline.current_paper_index}
+                    totalPapers={totalPapersThisCycle}
+                    remainingPapers={state.incoming_papers.length}
+                    onApprove={approveBriefing}
+                    onReject={rejectBriefing}
+                  />
+                </>
+              ) : (
+                <LibraryView briefings={state.approved_briefings} />
               )}
-
-              {/* Jidoka Alert */}
-              {hasUnresolvedHalts && currentHalt && (
-                <JidokaAlert
-                  halt={currentHalt}
-                  kaizenProposal={currentKaizen}
-                  onResolve={resolveJidoka}
-                  onSelectKaizen={handleKaizenSelect}
-                />
-              )}
-
-              {/* Pipeline Progress — real-time Flywheel economics */}
-              {showPipelineProgress && (
-                <PipelineProgress
-                  totalPapers={totalPapersThisCycle}
-                  processedCount={processedCount}
-                  greenCount={greenCount}
-                  yellowCount={yellowCount}
-                  redCount={redCount}
-                  tier0Count={state.stats.tier0_classifications}
-                  tier2Count={state.stats.tier2_classifications}
-                  apiCost={state.stats.total_api_cost_usd}
-                  currentStage={pipeline.current_stage}
-                />
-              )}
-
-              {/* Skill Proposals */}
-              <SkillProposals
-                proposals={skillProposals}
-                onApprove={approveSkillProposal}
-                onReject={rejectSkillProposal}
-              />
-
-              {/* Pending Governance — ONE-PIECE FLOW */}
-              <PendingGovernance
-                briefings={pendingBriefings}
-                pipelineStage={pipeline.current_stage}
-                currentPaperIndex={pipeline.current_paper_index}
-                totalPapers={totalPapersThisCycle}
-                remainingPapers={state.incoming_papers.length}
-                onApprove={approveBriefing}
-                onReject={rejectBriefing}
-              />
             </div>
           </main>
 

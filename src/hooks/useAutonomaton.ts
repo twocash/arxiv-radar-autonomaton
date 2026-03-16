@@ -539,15 +539,20 @@ export function useAutonomaton() {
     processingRef.current.recognition = nextPaper.arxiv_id
 
     // Classify the paper
+    const paperId = nextPaper.arxiv_id // Capture for closure
     classifyPaperService(nextPaper, state.skills, state.settings).then(result => {
-      // Keep processingRef set during dispatch — the loop protects us
-      // Once stage moves (via PAPER_CLASSIFIED/ARCHIVED), effect returns early on re-fire
+      // RACE CONDITION GUARD: If stage moved away, another paper already dispatched
+      // This happens when effect re-fires before .then() callback runs
+      if (processingRef.current.recognition !== paperId) {
+        console.log(`[Pipeline] Recognition: Skipping stale callback for ${paperId}`)
+        return
+      }
 
       // LOG ROUTING DECISION — makes Cognitive Router auditable
       dispatch({
         type: 'TELEMETRY_LOGGED',
         entry: telemetry.createTelemetryEntry('recognition', 'routing_decision', {
-          arxiv_id: nextPaper.arxiv_id,
+          arxiv_id: paperId,
           tier: result.tier === 'T0-skill' ? 0 : result.tier === 'T0-keyword' ? 0 : result.tier === 'T2' ? 2 : 0,
           details: `Tier ${result.tier}: ${result.tier === 'T0-skill' ? 'Skill match' : result.tier === 'T0-keyword' ? 'Keyword threshold met' : result.tier === 'T2' ? 'LLM classification' : 'Dev mode mock'}`,
           confidence: result.paper?.relevance_score,
@@ -556,7 +561,7 @@ export function useAutonomaton() {
       })
 
       if (result.success && result.paper) {
-        console.log(`[Pipeline] Recognition: ${nextPaper.arxiv_id} → ${result.paper.zone.toUpperCase()}`)
+        console.log(`[Pipeline] Recognition: ${paperId} → ${result.paper.zone.toUpperCase()}`)
         if (result.paper.zone === 'green') {
           // Auto-archive GREEN papers
           transition({ type: 'PAPER_ARCHIVED', paper: result.paper, classification_cost_usd: result.cost_usd })
@@ -565,7 +570,7 @@ export function useAutonomaton() {
           transition({ type: 'PAPER_CLASSIFIED', paper: result.paper, classification_cost_usd: result.cost_usd })
         }
       } else if (result.jidokaHalt) {
-        console.log(`[Pipeline] Recognition: ${nextPaper.arxiv_id} → JIDOKA (${result.jidokaHalt.trigger})`)
+        console.log(`[Pipeline] Recognition: ${paperId} → JIDOKA (${result.jidokaHalt.trigger})`)
         // Jidoka halt — transition will handle it via guards
         // The halt is already created, dispatch it directly
         dispatch({ type: 'JIDOKA_HALT', event: result.jidokaHalt })
@@ -573,7 +578,7 @@ export function useAutonomaton() {
         dispatch({ type: 'KAIZEN_PROPOSAL_CREATED', proposal: kaizenProposal })
       }
 
-      // NOW safe to reset — stage has moved, loop protects against re-entry
+      // Reset AFTER dispatch — stage has moved
       processingRef.current.recognition = null
     })
   }, [

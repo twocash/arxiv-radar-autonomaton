@@ -27,7 +27,7 @@ export function FlywheelFooter({ stats, migrationsThisSession = 0 }: Props) {
     >
       {/* Tier Distribution */}
       <div className="flex items-center gap-6 font-mono text-xs">
-        {/* Tier 0 Skills */}
+        {/* Tier 0 Skills + Savings */}
         <div className="flex items-center gap-2">
           <span
             className="px-2 py-0.5 rounded-sm"
@@ -41,6 +41,19 @@ export function FlywheelFooter({ stats, migrationsThisSession = 0 }: Props) {
           <span style={{ color: 'var(--zone-green-text)' }}>
             {stats.tier0_skills} skill{stats.tier0_skills !== 1 ? 's' : ''}
           </span>
+          {/* Defensible savings: only from skill executions */}
+          {stats.skill_executions > 0 && (
+            <span
+              className="px-1.5 py-0.5 rounded-sm"
+              style={{
+                backgroundColor: 'rgba(94, 191, 80, 0.15)',
+                color: 'var(--zone-green-text)',
+              }}
+              title={`${stats.skill_executions} skill executions avoided T2 calls`}
+            >
+              saved ${stats.estimated_savings.toFixed(3)}
+            </span>
+          )}
         </div>
 
         {/* Tier 2 Model + Cost */}

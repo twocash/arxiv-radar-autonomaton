@@ -800,6 +800,23 @@ export function useAutonomaton() {
   const flywheelStats = useMemo((): FlywheelDisplayStats => {
     const activeSkills = state.skills.filter(s => !s.deprecated)
 
+    // Defensible savings calculation:
+    // Sum of all skill executions (times_fired) × average briefing cost
+    const totalSkillExecutions = state.skills.reduce(
+      (sum, skill) => sum + skill.times_fired,
+      0
+    )
+
+    // Calculate average T2 briefing cost from actual data
+    // Fallback to conservative estimate if no T2 data yet
+    const t2Briefings = state.stats.tier2_classifications
+    const avgBriefingCost = t2Briefings > 0
+      ? state.stats.total_api_cost_usd / t2Briefings
+      : 0.005 // Conservative estimate: ~$0.005 per Sonnet briefing
+
+    // Only count savings if skills have actually fired
+    const estimatedSavings = totalSkillExecutions * avgBriefingCost
+
     return {
       tier0_skills: activeSkills.length,
       tier2_model: 'Sonnet',
@@ -808,6 +825,8 @@ export function useAutonomaton() {
       briefings_approved: state.stats.briefings_approved,
       skills_promoted: state.skills.length,
       migrations_this_session: 0, // TODO: Track per session
+      skill_executions: totalSkillExecutions,
+      estimated_savings: estimatedSavings,
     }
   }, [state.skills, state.stats])
 

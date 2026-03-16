@@ -182,6 +182,9 @@ export interface FlywheelDisplayStats {
   briefings_approved: number
   skills_promoted: number
   migrations_this_session: number
+  // Defensible savings: skill executions × avg briefing cost
+  skill_executions: number      // Total times skills fired (avoided T2 calls)
+  estimated_savings: number     // USD saved by skill executions
 }
 
 // =============================================================================

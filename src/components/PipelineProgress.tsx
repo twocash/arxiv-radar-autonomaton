@@ -41,8 +41,9 @@ export function PipelineProgress({
   // Stage-specific status text
   const stageText = {
     telemetry: 'Fetching from arXiv...',
-    recognition: `Classifying ${processedCount}/${totalPapers}`,
-    compilation: 'Generating briefings...',
+    recognition: `Analyzing ${processedCount}/${totalPapers} papers`,
+    compilation: 'Preparing analysis...',
+    execution: 'Saving to library...',
   }[currentStage] || 'Processing...'
 
   return (
@@ -116,10 +117,10 @@ export function PipelineProgress({
           style={{ borderTop: '1px solid var(--border)' }}
         >
           <span style={{ color: 'var(--zone-green-text)' }}>
-            {greenCount} archived
+            {greenCount} filtered
           </span>
           <span style={{ color: 'var(--zone-yellow-text)' }}>
-            {yellowCount} briefings
+            {yellowCount} promising
           </span>
           {redCount > 0 && (
             <span style={{ color: 'var(--zone-red-text)' }}>

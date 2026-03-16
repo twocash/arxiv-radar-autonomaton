@@ -1,11 +1,11 @@
 /**
- * BriefingCard — A pending briefing awaiting human approval
+ * BriefingCard — A pending briefing awaiting human review
  *
  * Displays:
- * - Zone badge (GREEN/YELLOW/RED)
+ * - Zone badge (YELLOW/RED) + Thesis signal (🟢/🔴/⚪)
  * - Matched topics
- * - Headline and body
- * - Approve/Edit/Reject actions
+ * - Headline and lead (structured content)
+ * - Save to Library / Edit & Save / Skip actions
  * - Expandable provenance trace (transparency as architecture)
  *
  * @license CC BY 4.0
@@ -21,9 +21,17 @@ interface Props {
   onReject: (briefingId: string, reason?: string) => void
 }
 
+// Thesis signal display
+const THESIS_BADGES: Record<string, { emoji: string; label: string; color: string }> = {
+  supports_decentralized: { emoji: '🟢', label: 'Decentralized', color: 'var(--zone-green-text)' },
+  supports_centralized: { emoji: '🔴', label: 'Centralized', color: 'var(--zone-red-text)' },
+  neutral: { emoji: '⚪', label: 'Neutral', color: 'var(--text-muted)' },
+}
+
 export function BriefingCard({ briefing, onApprove, onReject }: Props) {
   const [showTrace, setShowTrace] = useState(false)
   const { paper } = briefing
+  const thesis = THESIS_BADGES[briefing.thesis_signal] || THESIS_BADGES.neutral
 
   return (
     <div
@@ -33,10 +41,17 @@ export function BriefingCard({ briefing, onApprove, onReject }: Props) {
         borderRadius: '2px',
       }}
     >
-      {/* Header: Zone + Topics */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* Header: Zone + Thesis Signal + Topics */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className={`zone-badge zone-badge-${paper.zone}`}>
           {paper.zone.toUpperCase()}
+        </span>
+        <span
+          className="font-mono text-xs px-1.5 py-0.5 rounded-sm"
+          style={{ color: thesis.color }}
+          title={briefing.thesis_reason}
+        >
+          {thesis.emoji} {thesis.label}
         </span>
         <span
           className="font-mono text-xs"
@@ -65,13 +80,23 @@ export function BriefingCard({ briefing, onApprove, onReject }: Props) {
         {briefing.headline}
       </h3>
 
-      {/* Body */}
+      {/* Lead (Why This Matters) - prefer lead, fall back to body */}
       <p
         className="font-body text-sm mb-3"
         style={{ color: 'var(--text-secondary)' }}
       >
-        {briefing.body}
+        {briefing.lead || briefing.body}
       </p>
+
+      {/* Thesis Reason */}
+      {briefing.thesis_reason && (
+        <p
+          className="font-mono text-xs mb-3 italic"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {thesis.emoji} {briefing.thesis_reason}
+        </p>
+      )}
 
       {/* Meta: Tier + Pattern Hash */}
       <div
@@ -109,20 +134,20 @@ export function BriefingCard({ briefing, onApprove, onReject }: Props) {
             color: 'var(--zone-green-text)',
           }}
         >
-          ✓ Approve
+          ✓ Save to Library
         </button>
         <button className="btn">
-          ✎ Edit
+          ✎ Edit & Save
         </button>
         <button
           className="btn"
           onClick={() => onReject(briefing.id)}
           style={{
-            borderColor: 'var(--zone-red)',
-            color: 'var(--zone-red-text)',
+            borderColor: 'var(--text-muted)',
+            color: 'var(--text-muted)',
           }}
         >
-          ✗ Reject
+          Skip
         </button>
 
         {/* Trace Toggle */}

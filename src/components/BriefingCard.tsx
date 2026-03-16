@@ -14,6 +14,7 @@
 import { useState } from 'react'
 import type { DraftBriefing } from '../types/app'
 import { PaperTrace } from './PaperTrace'
+import { ShareButton } from './ShareButton'
 
 interface Props {
   briefing: DraftBriefing
@@ -149,6 +150,11 @@ export function BriefingCard({ briefing, onApprove, onReject }: Props) {
         >
           Skip
         </button>
+
+        {/* Share Button — only for social_post voice */}
+        {briefing.voice_preset === 'social_post' && (
+          <ShareButton briefing={briefing} />
+        )}
 
         {/* Trace Toggle */}
         <button

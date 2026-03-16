@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import type { ApprovedBriefing, ThesisSignal } from '../state/types'
 import type { Zone } from '../config/zones'
+import { ShareButton } from './ShareButton'
 
 interface Props {
   briefings: ApprovedBriefing[]
@@ -316,6 +317,13 @@ export function LibraryView({ briefings }: Props) {
                         View on arXiv →
                       </a>
                     </div>
+
+                    {/* Share Button — only for social_post voice */}
+                    {briefing.voice_preset === 'social_post' && (
+                      <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+                        <ShareButton briefing={briefing} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -129,7 +129,7 @@ export function GlassPipeline({
             <div
               className={`
                 flex items-center gap-2 px-3 py-1.5 rounded-sm
-                font-mono text-xs transition-all duration-200
+                font-mono text-xs transition-all duration-100
                 ${status === 'halt' ? 'animate-pulse' : ''}
                 ${isActive ? 'ring-1 ring-[var(--accent)]' : ''}
               `}

@@ -36,7 +36,21 @@
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(git push:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)",
+      "Bash(git -C arxiv-test-app worktree add:*)",
+      "Bash(git -C . worktree add:*)",
+      "Bash(surfaced. Skills like this save money and keep data local.\"\n\nAlso adds defensible savings calculation and footer display.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git worktree:*)",
+      "Bash(git worktree add:*)",
+      "Bash(powershell -Command \"Get-Content src/App.tsx | ForEach-Object { $_-replace ''\\(  const currentKaizen = currentHalt[\\\\s\\\\S]*?: undefined\\)'', @''\n  const currentKaizen = currentHalt\n    ? kaizenProposals.find\\(k => k.jidoka_event_id === currentHalt.id\\)\n    : undefined\n\n  // ZONE VISUALIZATION: Derive active paper''s zone for pipeline coloring\n  const activePaperZone = useMemo\\(\\(\\) => {\n    if \\(pipeline.current_stage === ''idle'' || pipeline.current_stage === ''telemetry''\\) return null\n    // During approval, show the pending briefing''s zone\n    if \\(pendingBriefings.length > 0\\) return pendingBriefings[0].paper.zone\n    // During recognition/compilation, show the paper being processed\n    if \\(state.classified_papers.length > 0\\) return state.classified_papers[0].zone\n    return null\n  }, [pipeline.current_stage, pendingBriefings, state.classified_papers]\\)\n\n  // JIDOKA TRACE CONTEXT: Filter telemetry for current halt''s paper\n  const currentHaltContext = useMemo\\(\\(\\) => {\n    if \\(!currentHalt?.paper_id\\) return []\n    return telemetryLog.filter\\(entry =>\n      entry.arxiv_id === currentHalt.paper_id ||\n      entry.event === ''invalid_transition''\n    \\)\n  }, [currentHalt, telemetryLog]\\)\n''@ }\")",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)"
     ]
   }
 }

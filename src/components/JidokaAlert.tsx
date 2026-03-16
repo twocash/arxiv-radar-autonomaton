@@ -151,8 +151,7 @@ export function JidokaAlert({ halt, kaizenProposal, onResolve, onSelectKaizen, t
               <button
                 key={i}
                 className={`
-                  text-left px-3 py-2 rounded-sm border text-xs
-                  cursor-pointer transition-all duration-150
+                  text-left px-3 py-2 rounded-sm border text-xs cursor-pointer transition-all duration-100 active:scale-[0.98]
                   ${option.is_recommended
                     ? 'bg-[rgba(212,98,26,0.1)] border-[var(--accent)] hover:bg-[rgba(212,98,26,0.25)]'
                     : 'bg-[rgba(0,0,0,0.2)] border-[var(--border)] hover:bg-[rgba(255,255,255,0.05)]'

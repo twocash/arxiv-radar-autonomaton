@@ -158,7 +158,7 @@ function App() {
                 style={{ borderColor: 'var(--border)' }}
               >
                 <button
-                  className="px-4 py-2 font-mono text-sm transition-colors"
+                  className="px-4 py-2 font-mono text-sm transition-all duration-100 active:scale-[0.98]"
                   style={{
                     color: activeTab === 'processing' ? 'var(--accent)' : 'var(--text-muted)',
                     borderBottom: activeTab === 'processing' ? '2px solid var(--accent)' : '2px solid transparent',
@@ -169,7 +169,7 @@ function App() {
                   Processing
                 </button>
                 <button
-                  className="px-4 py-2 font-mono text-sm transition-colors flex items-center gap-2"
+                  className="px-4 py-2 font-mono text-sm transition-all duration-100 active:scale-[0.98] flex items-center gap-2"
                   style={{
                     color: activeTab === 'library' ? 'var(--accent)' : 'var(--text-muted)',
                     borderBottom: activeTab === 'library' ? '2px solid var(--accent)' : '2px solid transparent',

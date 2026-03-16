@@ -27,29 +27,29 @@ function getEmptyStateMessage(stage: PipelineStage): { title: string; subtitle: 
     case 'telemetry':
       return {
         title: 'Fetching papers from arXiv...',
-        subtitle: 'Telemetry stage — gathering today\'s submissions',
+        subtitle: 'Gathering today\'s research submissions',
       }
     case 'recognition':
       return {
-        title: 'Classifying papers...',
-        subtitle: 'Recognition stage — Tier 0/2 classification in progress',
+        title: 'Analyzing papers...',
+        subtitle: 'Identifying promising developments',
       }
     case 'compilation':
       return {
-        title: 'Generating briefings...',
-        subtitle: 'Compilation stage — drafting YELLOW/RED briefings',
+        title: 'Preparing briefings...',
+        subtitle: 'Drafting analysis for notable findings',
       }
     case 'execution':
       return {
-        title: 'Executing approved actions...',
-        subtitle: 'Execution stage — publishing briefings',
+        title: 'Saving to library...',
+        subtitle: 'Completing this paper\'s journey',
       }
     case 'approval':
     case 'idle':
     default:
       return {
-        title: 'All papers processed',
-        subtitle: 'Pipeline idle. Click RUN to fetch new papers.',
+        title: 'Analysis complete',
+        subtitle: 'Click RUN to analyze new papers',
       }
   }
 }
@@ -79,7 +79,7 @@ export function PendingGovernance({
       >
         {hasBriefing ? (
           <>
-            <span>Governance Required</span>
+            <span>Needs Your Review</span>
             <span
               className="px-2 py-0.5 rounded-sm text-xs"
               style={{

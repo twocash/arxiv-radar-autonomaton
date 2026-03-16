@@ -33,7 +33,7 @@ export function VoiceSelector({ value, onChange }: Props) {
           `}
           title={voice.description}
         >
-          {voice.name}
+          {voice.label}
         </button>
       ))}
     </div>

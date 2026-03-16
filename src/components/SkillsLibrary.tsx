@@ -115,6 +115,19 @@ function SkillCard({
           className="mt-2 pt-2 border-t space-y-1"
           style={{ borderColor: 'var(--border)' }}
         >
+          {/* Provenance for seed skills */}
+          {skill.id.startsWith('seed-') && (
+            <div
+              className="mb-2 p-2 rounded-sm font-mono text-[10px] italic"
+              style={{
+                backgroundColor: 'rgba(212, 98, 26, 0.08)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Pre-launch training: 100 papers analyzed, governance patterns surfaced.
+              Skills like this save money and keep data local.
+            </div>
+          )}
           <p className="font-mono text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Pattern:</span> {skill.pattern_hash}
           </p>

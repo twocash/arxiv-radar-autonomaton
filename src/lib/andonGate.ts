@@ -297,7 +297,7 @@ export function getTargetStage(action: CombinedAction): PipelineStage | null {
     case 'PAPER_CLASSIFIED':
       return 'compilation' // ONE-PIECE: Immediately compile this paper's briefing
     case 'PAPER_ARCHIVED':
-      return 'recognition' // ONE-PIECE: Continue to next paper (reducer handles idle)
+      return 'execution' // 5-STAGE INVARIANT: GREEN papers also go through execution
     case 'BRIEFING_COMPILED':
       return 'approval'
     case 'BRIEFING_APPROVED':

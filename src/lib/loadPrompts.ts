@@ -10,10 +10,11 @@
 import type { VoicePresetId } from '../config/voices'
 
 // Raw markdown imports (configured in vite-env.d.ts)
+// Note: File names kept for backward compat, mapped to new voice IDs
 import classifyPaperRaw from '../prompts/classify-paper.md?raw'
-import newsBriefRaw from '../prompts/news-brief.md?raw'
-import technicalSummaryRaw from '../prompts/technical-summary.md?raw'
-import strategicIntelRaw from '../prompts/strategic-intel.md?raw'
+import quickScanRaw from '../prompts/news-brief.md?raw'       // Was news-brief
+import deepAnalysisRaw from '../prompts/strategic-intel.md?raw' // Was strategic-intel
+import socialPostRaw from '../prompts/technical-summary.md?raw' // Was technical-summary
 
 // =============================================================================
 // PROMPT TEMPLATES
@@ -21,9 +22,14 @@ import strategicIntelRaw from '../prompts/strategic-intel.md?raw'
 
 export const prompts = {
   classify: classifyPaperRaw,
-  news_brief: newsBriefRaw,
-  technical_summary: technicalSummaryRaw,
-  strategic_intel: strategicIntelRaw,
+  // New voice IDs mapped to existing prompt files
+  quick_scan: quickScanRaw,
+  deep_analysis: deepAnalysisRaw,
+  social_post: socialPostRaw,
+  // Legacy aliases for backward compat
+  news_brief: quickScanRaw,
+  technical_summary: socialPostRaw,
+  strategic_intel: deepAnalysisRaw,
 } as const
 
 export type PromptKey = keyof typeof prompts
@@ -43,14 +49,14 @@ export function getClassifyPrompt(): string {
  * Get a voice-specific briefing prompt template
  */
 export function getBriefingPrompt(voice: VoicePresetId): string {
-  return prompts[voice]
+  return prompts[voice] || prompts.quick_scan
 }
 
 /**
  * Get all available voice prompt keys
  */
 export function getVoicePromptKeys(): VoicePresetId[] {
-  return ['news_brief', 'technical_summary', 'strategic_intel']
+  return ['quick_scan', 'deep_analysis', 'social_post']
 }
 
 // =============================================================================

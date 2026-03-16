@@ -540,8 +540,14 @@ export function useAutonomaton() {
 
     // Classify the paper
     classifyPaperService(nextPaper, state.skills, state.settings).then(result => {
-      // Keep processingRef set during dispatch — the loop protects us
-      // Once stage moves (via PAPER_CLASSIFIED/ARCHIVED), effect returns early on re-fire
+      // ARCHITECTURE GUARD: Check we're still in recognition stage
+      // Async callbacks can fire after stage transitions — reject stale callbacks
+      const currentStage = stateRef.current.pipeline.current_stage
+      if (currentStage !== 'recognition') {
+        console.log(`[Pipeline] Recognition: Callback for ${nextPaper.arxiv_id} arrived during ${currentStage} — ignoring (stage moved)`)
+        processingRef.current.recognition = null
+        return
+      }
 
       // LOG ROUTING DECISION — makes Cognitive Router auditable
       dispatch({
@@ -557,6 +563,14 @@ export function useAutonomaton() {
 
       if (result.success && result.paper) {
         console.log(`[Pipeline] Recognition: ${nextPaper.arxiv_id} → ${result.paper.zone.toUpperCase()}`)
+
+        // SKILL FIRED — Track skill executions for Flywheel savings
+        // Skills go through the pipeline like everything else
+        if (result.tier === 'T0-skill' && result.paper.classified_by.model) {
+          const skillId = result.paper.classified_by.model.replace('skill:', '')
+          transition({ type: 'SKILL_FIRED', skillId, paperId: nextPaper.arxiv_id })
+        }
+
         if (result.paper.zone === 'green') {
           // Auto-archive GREEN papers
           transition({ type: 'PAPER_ARCHIVED', paper: result.paper, classification_cost_usd: result.cost_usd })
@@ -635,6 +649,14 @@ export function useAutonomaton() {
     } else if (state.settings.api_key) {
       // Real compilation with Anthropic API
       compileBriefing(nextPaper, state.voice_preset, state.settings.api_key).then(result => {
+        // ARCHITECTURE GUARD: Check we're still in compilation stage
+        const currentStage = stateRef.current.pipeline.current_stage
+        if (currentStage !== 'compilation') {
+          console.log(`[Pipeline] Compilation: Callback for ${nextPaper.arxiv_id} arrived during ${currentStage} — ignoring (stage moved)`)
+          processingRef.current.compilation = null
+          return
+        }
+
         processingRef.current.compilation = null
 
         if (result.success && result.briefing) {
@@ -702,9 +724,20 @@ export function useAutonomaton() {
   useEffect(() => {
     if (state.pipeline.current_stage !== 'execution') return
 
-    console.log(`[Pipeline] EXECUTION: ${state.incoming_papers.length} papers remaining`)
+    const papersRemaining = state.incoming_papers.length
+    const nextAction = papersRemaining > 0 ? 'next paper' : 'cycle complete'
 
-    // Single clean transition — telemetry handled by transition system
+    console.log(`[Pipeline] EXECUTION: ${papersRemaining} papers remaining → ${nextAction}`)
+
+    // FEED-FIRST: Log execution stage telemetry
+    dispatch({
+      type: 'TELEMETRY_LOGGED',
+      entry: telemetry.createTelemetryEntry('execution', 'stage_execution', {
+        details: `Execution complete. ${papersRemaining} papers remaining. Next: ${nextAction}`,
+      }),
+    })
+
+    // Complete the 5-stage invariant
     transition({ type: 'EXECUTION_COMPLETE' })
   }, [state.pipeline.current_stage, state.incoming_papers.length, transition])
 
@@ -800,6 +833,23 @@ export function useAutonomaton() {
   const flywheelStats = useMemo((): FlywheelDisplayStats => {
     const activeSkills = state.skills.filter(s => !s.deprecated)
 
+    // Defensible savings calculation:
+    // Sum of all skill executions (times_fired) × average briefing cost
+    const totalSkillExecutions = state.skills.reduce(
+      (sum, skill) => sum + skill.times_fired,
+      0
+    )
+
+    // Calculate average T2 briefing cost from actual data
+    // Fallback to conservative estimate if no T2 data yet
+    const t2Briefings = state.stats.tier2_classifications
+    const avgBriefingCost = t2Briefings > 0
+      ? state.stats.total_api_cost_usd / t2Briefings
+      : 0.005 // Conservative estimate: ~$0.005 per Sonnet briefing
+
+    // Only count savings if skills have actually fired
+    const estimatedSavings = totalSkillExecutions * avgBriefingCost
+
     return {
       tier0_skills: activeSkills.length,
       tier2_model: 'Sonnet',
@@ -808,6 +858,8 @@ export function useAutonomaton() {
       briefings_approved: state.stats.briefings_approved,
       skills_promoted: state.skills.length,
       migrations_this_session: 0, // TODO: Track per session
+      skill_executions: totalSkillExecutions,
+      estimated_savings: estimatedSavings,
     }
   }, [state.skills, state.stats])
 

@@ -15,6 +15,7 @@
 import type { AppState, Settings, TelemetryEntry } from '../types/app'
 import { INITIAL_STATE } from '../state/types'
 import { DEFAULT_SETTINGS, INITIAL_APP_STATE } from '../types/app'
+import { SEED_SKILLS } from '../config/seedSkills'
 
 // Storage keys
 const KEYS = {

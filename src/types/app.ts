@@ -14,6 +14,7 @@ import type {
 } from '../state/types'
 import type { Zone } from '../config/zones'
 import type { CognitiveTier } from '../config/routing'
+import { SEED_SKILLS } from '../config/seedSkills'
 
 // =============================================================================
 // SKILL — Promoted pattern from Flywheel
@@ -135,7 +136,7 @@ export interface AppState extends ArxivRadarState {
 // =============================================================================
 
 export const INITIAL_APP_STATE: Omit<AppState, keyof ArxivRadarState> = {
-  skills: [],
+  skills: SEED_SKILLS, // Pre-trained from real session telemetry
   skill_proposals: [],
   telemetry_log: [],
   kaizen_proposals: [],
